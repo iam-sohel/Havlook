@@ -2,10 +2,16 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-# Update OS packages to patched versions
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get clean && \
+# Update OS packages and remove the unused Pebble executable if present.
+RUN set -eu; \
+    apt-get update; \
+    apt-get upgrade -y; \
+    if [ -e /usr/bin/pebble ] || [ -L /usr/bin/pebble ]; then \
+      echo "Removing unused Pebble executable"; \
+      rm -f /usr/bin/pebble; \
+    fi; \
+    test ! -e /usr/bin/pebble && test ! -L /usr/bin/pebble; \
+    apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user

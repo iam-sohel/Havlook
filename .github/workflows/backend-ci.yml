@@ -212,33 +212,43 @@ jobs:
       # ------------------------------------------------------
 
       - name: Build Docker image
-        if: >
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+          github.event_name == 'pull_request'
 
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
 
         run: |
-          docker build \
-            --pull \
-            -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
-            .
+          LOCAL_IMAGE="nextcart/backend:$IMAGE_TAG"
+
+          if [ -n "$ECR_REGISTRY" ]; then
+            docker build \
+              --pull \
+              -t "$LOCAL_IMAGE" \
+              -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" \
+              .
+          else
+            docker build \
+              --pull \
+              -t "$LOCAL_IMAGE" \
+              .
+          fi
 
       # ------------------------------------------------------
       # DOCKER IMAGE VULNERABILITY SCAN
       # ------------------------------------------------------
 
       - name: Scan Docker image
-        if: >
-          github.event_name == 'push' &&
-          github.ref == 'refs/heads/master'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+          github.event_name == 'pull_request'
 
         uses: aquasecurity/trivy-action@v0.36.0
 
         with:
-          image-ref: '${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}'
+          image-ref: 'nextcart/backend:${{ github.sha }}'
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
