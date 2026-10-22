@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
 import {
   Box,
   Button,
@@ -13,35 +12,57 @@ import {
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 
-/**
- * HAVLOOK — CartOrderSummary
- *
- * The right-hand order summary. Pure presentation: every amount comes
- * from the backend cart response (productPrice → "MRP", totalDiscount →
- * "Discount", orderTotal → "Total Payable") surfaced through the store.
- * No pricing logic is invented here.
- *
- * The checkout CTA keeps the existing `/checkout` navigation and the
- * existing "cart must be complete before checkout" gating.
- */
-export default function CartOrderSummary({
-  productPrice,
-  totalDiscount,
-  orderTotal,
-  itemCount,
-  checkoutDisabled,
-  checkoutDisabledReason,
-  updating,
-}: {
-  productPrice: number;
-  totalDiscount: number;
-  orderTotal: number;
-  itemCount: number;
+interface CartOrderSummaryProps {
+  productPrice?: number;
+  totalDiscount?: number;
+  orderTotal?: number;
+  deliveryCharge?: number;
+  itemCount?: number;
   checkoutDisabled?: boolean;
   checkoutDisabledReason?: string;
   updating?: boolean;
-}) {
-  const showDiscount = totalDiscount > 0;
+}
+
+function toSafeNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function formatMoney(amount: number): string {
+  return amount.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  });
+}
+
+export default function CartOrderSummary({
+  productPrice = 0,
+  totalDiscount = 0,
+  orderTotal = 0,
+  deliveryCharge = 0,
+  itemCount = 0,
+  checkoutDisabled,
+  checkoutDisabledReason,
+  updating,
+}: CartOrderSummaryProps) {
+  const safeProductPrice = toSafeNumber(productPrice);
+  const safeTotalDiscount = toSafeNumber(totalDiscount);
+  const safeOrderTotal = toSafeNumber(orderTotal);
+ 
+  const safeDeliveryCharge = toSafeNumber(deliveryCharge);
+
+  const safeItemCount = toSafeNumber(itemCount);
+
+  const showDiscount = safeTotalDiscount > 0;
+  const totalPayable = safeOrderTotal + safeDeliveryCharge;
 
   return (
     <Box
@@ -61,7 +82,6 @@ export default function CartOrderSummary({
 
       <Divider sx={{ my: 2.5 }} />
 
-      {/* PRICE DETAILS row — Flipkart-style section label. */}
       <Typography
         variant="overline"
         sx={{
@@ -72,34 +92,38 @@ export default function CartOrderSummary({
           mb: 1.5,
         }}
       >
-        Price Details ({itemCount} {itemCount === 1 ? "item" : "items"})
+        Price Details ({safeItemCount}{" "}
+        {safeItemCount === 1 ? "item" : "items"})
       </Typography>
 
       <Stack spacing={1.5}>
-        {/* Total MRP — only shown when the backend reports a discount. */}
         {showDiscount && (
           <Stack direction="row" sx={{ justifyContent: "space-between" }}>
             <Typography color="text.secondary">
-              Price ({itemCount} {itemCount === 1 ? "item" : "items"})
+              Price ({safeItemCount}{" "}
+              {safeItemCount === 1 ? "item" : "items"})
             </Typography>
+
             <Typography sx={{ fontVariantNumeric: "tabular-nums" }}>
-              ₹{productPrice.toLocaleString("en-IN")}
+              ₹{formatMoney(safeProductPrice)}
             </Typography>
           </Stack>
         )}
 
-        {/* Subtotal — the backend orderTotal; unchanged semantics. */}
         <Stack direction="row" sx={{ justifyContent: "space-between" }}>
           <Typography color="text.secondary">Subtotal</Typography>
-          <Typography sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-            ₹{orderTotal.toLocaleString("en-IN")}
+
+          <Typography
+            sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+          >
+            ₹{formatMoney(safeOrderTotal)}
           </Typography>
         </Stack>
 
-        {/* Backend-reported discount. */}
         {showDiscount && (
           <Stack direction="row" sx={{ justifyContent: "space-between" }}>
             <Typography color="text.secondary">Discount</Typography>
+
             <Typography
               sx={{
                 color: "success.main",
@@ -107,24 +131,33 @@ export default function CartOrderSummary({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              − ₹{totalDiscount.toLocaleString("en-IN")}
+              − ₹{formatMoney(safeTotalDiscount)}
             </Typography>
           </Stack>
         )}
 
-        {/* Shipping is a UI affirmation, not a price promise: the backend
-            orderTotal already accounts for it. */}
         <Stack direction="row" sx={{ justifyContent: "space-between" }}>
           <Typography color="text.secondary">Shipping</Typography>
-          <Typography sx={{ color: "success.main", fontWeight: 600 }}>
-            Free
+
+          <Typography
+            sx={{
+              fontWeight: 600,
+              fontVariantNumeric: "tabular-nums",
+              color:
+                safeDeliveryCharge === 0
+                  ? "success.main"
+                  : "text.primary",
+            }}
+          >
+            {safeDeliveryCharge === 0
+              ? "Free"
+              : `₹${formatMoney(safeDeliveryCharge)}`}
           </Typography>
         </Stack>
       </Stack>
 
       <Divider sx={{ my: 2.5 }} />
 
-      {/* Final payable amount — backend orderTotal. */}
       <Stack
         direction="row"
         sx={{ justifyContent: "space-between", alignItems: "baseline" }}
@@ -132,6 +165,7 @@ export default function CartOrderSummary({
         <Typography sx={{ fontWeight: 700, fontSize: "1.0625rem" }}>
           Total Payable
         </Typography>
+
         <Typography
           sx={{
             fontWeight: 700,
@@ -139,16 +173,16 @@ export default function CartOrderSummary({
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          ₹{orderTotal.toLocaleString("en-IN")}
+          ₹{formatMoney(totalPayable)}
         </Typography>
       </Stack>
 
-      {showDiscount && productPrice > 0 && (
+      {showDiscount && safeProductPrice > 0 && (
         <Typography
           variant="body2"
           sx={{ mt: 1, color: "success.main", fontWeight: 600 }}
         >
-          You will save ₹{totalDiscount.toLocaleString("en-IN")} on this order
+          You will save ₹{formatMoney(safeTotalDiscount)} on this order
         </Typography>
       )}
 
@@ -160,7 +194,9 @@ export default function CartOrderSummary({
         size="large"
         disabled={checkoutDisabled || updating}
         startIcon={
-          updating ? <CircularProgress size={16} color="inherit" /> : undefined
+          updating ? (
+            <CircularProgress size={16} color="inherit" />
+          ) : undefined
         }
         sx={{
           mt: 3,
@@ -193,24 +229,33 @@ export default function CartOrderSummary({
         Continue Shopping
       </Button>
 
-      {/* Reassurance row — static trust copy, no fake data. */}
       <Stack
         direction="row"
         spacing={2}
-        sx={{ mt: 3, pt: 2.5, borderTop: "1px solid", borderColor: "divider" }}
+        sx={{
+          mt: 3,
+          pt: 2.5,
+          borderTop: "1px solid",
+          borderColor: "divider",
+        }}
       >
-        <LocalShippingOutlinedIcon sx={{ fontSize: 20, color: "text.secondary" }} />
+        <LocalShippingOutlinedIcon
+          sx={{ fontSize: 20, color: "text.secondary" }}
+        />
+
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            Free delivery
+            Delivery charge
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            On eligible orders
+            Calculated from your order total
           </Typography>
         </Box>
+
         <ShieldOutlinedIcon
           sx={{ fontSize: 20, color: "text.secondary", ml: "auto" }}
         />
+
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
             Safe payments

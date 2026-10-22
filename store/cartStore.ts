@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from "zustand";
@@ -10,29 +11,16 @@ import {
   type CartResponseWire,
 } from "@/services/cartService";
 
-/* ─────────────────────────────────────────────────────────────────────
-   Types
-   ───────────────────────────────────────────────────────────────────── */
-
 export interface CartItem {
   id: number | string;
   productId: number;
-
   slug: string;
   title: string;
   image: string;
-
-  /** Backend unitPrice */
   price: number;
-
   quantity: number;
-
-  /** Backend lineTotal */
   itemTotal: number;
-
-  /** Backend productVariantId */
   variantId?: string | number;
-
   variantLabel?: string;
 }
 
@@ -57,21 +45,23 @@ interface AddToCartInput {
 
 interface CartStore {
   items: CartItem[];
-
   loading: boolean;
   error: string | null;
 
-  /** Backend orderTotal */
+  /** Backend orderTotal — product subtotal after discounts, excluding delivery. */
   serverGrandTotal: number;
 
-  /** Backend totalItems */
+  /** Backend totalItems. */
   serverTotalItems: number;
 
-  /** Backend productPrice — total MRP value before discount. */
+  /** Backend productPrice — total MRP before discounts. */
   serverProductPrice: number;
 
-  /** Backend totalDiscount — total discount applied across the cart. */
+  /** Backend totalDiscount — total discount across the cart. */
   serverTotalDiscount: number;
+
+  /** Backend deliveryCharge — calculated from active delivery rules. */
+  serverDeliveryCharge: number;
 
   addToCart: (input: AddToCartInput) => Promise<{
     ok: boolean;
@@ -94,21 +84,10 @@ interface CartStore {
   }>;
 
   clearCart: () => Promise<void>;
-
-  /**
-   * Drop local cart state WITHOUT calling the backend.
-   *
-   * Used on logout/session expiry, when there is no authenticated session to
-   * clear server-side. Checkout success keeps using `clearCart()`, which
-   * clears the server cart while the session is still valid.
-   */
   resetLocal: () => void;
-
   fetchCart: () => Promise<void>;
-
   clearError: () => void;
 
-  /** Existing page compatibility */
   increaseQuantity: (
     rowId: number | string,
     options?: { variantId?: string | number },
@@ -122,29 +101,14 @@ interface CartStore {
   totalCount: () => number;
 }
 
-/* ─────────────────────────────────────────────────────────────────────
-   Constants
-   ───────────────────────────────────────────────────────────────────── */
-
 const META_STORAGE_KEY = "HAVLOOK-cart-meta";
 
-/* ─────────────────────────────────────────────────────────────────────
-   Metadata helpers
-   ───────────────────────────────────────────────────────────────────── */
-
 function readMeta(): Record<string, CartMeta> {
-  if (typeof window === "undefined") {
-    return {};
-  }
+  if (typeof window === "undefined") return {};
 
   try {
-    const raw = window.localStorage.getItem(
-      META_STORAGE_KEY,
-    );
-
-    if (!raw) {
-      return {};
-    }
+    const raw = window.localStorage.getItem(META_STORAGE_KEY);
+    if (!raw) return {};
 
     const parsed = JSON.parse(raw);
 
@@ -162,12 +126,8 @@ function readMeta(): Record<string, CartMeta> {
   return {};
 }
 
-function writeMeta(
-  meta: Record<string, CartMeta>,
-) {
-  if (typeof window === "undefined") {
-    return;
-  }
+function writeMeta(meta: Record<string, CartMeta>) {
+  if (typeof window === "undefined") return;
 
   try {
     window.localStorage.setItem(
@@ -180,14 +140,9 @@ function writeMeta(
 }
 
 function ensureMeta(): Map<string, CartMeta> {
-  const raw = readMeta();
-
   return new Map(
-    Object.entries(raw).map(
-      ([key, value]) => [
-        key,
-        value ?? {},
-      ],
+    Object.entries(readMeta()).map(
+      ([key, value]) => [key, value ?? {}],
     ),
   );
 }
@@ -206,26 +161,18 @@ function saveItemMeta(
   writeMeta(existing);
 }
 
-function removeItemMeta(
-  cartItemId: number | string,
-) {
+function removeItemMeta(cartItemId: number | string) {
   const existing = readMeta();
-
   delete existing[String(cartItemId)];
-
   writeMeta(existing);
 }
 
-/* ─────────────────────────────────────────────────────────────────────
-   Backend → Frontend mapping
-   ───────────────────────────────────────────────────────────────────── */
+/* Backend → Frontend mapping */
 
 function mapWire(
   wire: CartResponseWire["items"][number],
 ): CartItem {
-  const meta = ensureMeta().get(
-    String(wire.id),
-  );
+  const meta = ensureMeta().get(String(wire.id));
 
   const backendImage =
     typeof wire.productImage === "string"
@@ -239,557 +186,242 @@ function mapWire(
 
   return {
     id: wire.id,
-
     productId: wire.productId,
-
     slug: meta?.slug ?? "",
-
-    title:
-      wire.productName ||
-      meta?.title ||
-      "",
-
-    /**
-     * Image priority:
-     *
-     * 1. Backend cart image
-     * 2. Real product image saved as cart metadata
-     * 3. Empty string
-     *
-     * No mock/placeholder image is used.
-     */
-    image:
-      backendImage ||
-      metadataImage ||
-      "",
-
-    /** Backend unitPrice */
+    title: wire.productName || meta?.title || "",
+    image: backendImage || metadataImage || "",
     price: wire.unitPrice,
-
     quantity: wire.quantity,
-
-    /** Backend lineTotal */
     itemTotal: wire.lineTotal,
-
-    /** Backend productVariantId */
-    variantId:
-      wire.productVariantId ??
-      meta?.variantId,
-
-    variantLabel:
-      meta?.variantLabel,
+    variantId: wire.productVariantId ?? meta?.variantId,
+    variantLabel: meta?.variantLabel,
   };
 }
 
-/* ─────────────────────────────────────────────────────────────────────
-   Apply backend response
-   ───────────────────────────────────────────────────────────────────── */
+/* Apply backend response */
 
 function apply(
   response: CartResponseWire,
   set: (
     partial:
       | Partial<CartStore>
-      | ((
-          state: CartStore,
-        ) => Partial<CartStore>),
+      | ((state: CartStore) => Partial<CartStore>),
   ) => void,
 ) {
-  const items =
-    response.items.map(mapWire);
+  console.log("Cart API data received by store:", response);
+  console.log("Delivery charge received by store:", response.deliveryCharge);
+  const items = response.items.map(mapWire);
 
-  /**
-   * Backend cart contract:
-   *
-   * productPrice  = price before discount
-   * totalDiscount = discount
-   * orderTotal    = final payable amount
-   */
-  const grandTotal =
-    response.orderTotal;
 
-  const totalItems =
-    response.totalItems;
+  const grandTotal = response.orderTotal;
+  const totalItems = response.totalItems;
 
   set({
     items,
     serverGrandTotal: grandTotal,
     serverTotalItems: totalItems,
-    serverProductPrice:
-      response.productPrice,
-    serverTotalDiscount:
-      response.totalDiscount,
+    serverProductPrice: response.productPrice,
+    serverTotalDiscount: response.totalDiscount,
+    serverDeliveryCharge: response.deliveryCharge,
     loading: false,
     error: null,
   });
 
-  return {
-    items,
-    grandTotal,
-    totalItems,
-  };
+  return { items, grandTotal, totalItems };
 }
 
-/* ─────────────────────────────────────────────────────────────────────
-   Zustand store
-   ───────────────────────────────────────────────────────────────────── */
+/* Zustand store */
 
-const useCartStore =
-  create<CartStore>((set, get) => ({
-    items: [],
+const useCartStore = create<CartStore>((set, get) => ({
+  items: [],
+  loading: false,
+  error: null,
 
-    loading: false,
+  serverGrandTotal: 0,
+  serverTotalItems: 0,
+  serverProductPrice: 0,
+  serverTotalDiscount: 0,
+  serverDeliveryCharge: 0,
 
-    error: null,
+  fetchCart: async () => {
+    set({ loading: true, error: null });
 
-    serverGrandTotal: 0,
+    try {
+      const result = await getCart();
 
-    serverTotalItems: 0,
-
-    serverProductPrice: 0,
-
-    serverTotalDiscount: 0,
-
-    /* ───────────────────────────────────────────────────────────────
-       Fetch cart
-       ─────────────────────────────────────────────────────────────── */
-
-    fetchCart: async () => {
-      set({
-        loading: true,
-        error: null,
-      });
-
-      try {
-        const result =
-          await getCart();
-
-        if (!result.ok) {
-          const message =
-            result.message ??
-            "Failed to load cart.";
-
-          set({
-            loading: false,
-            error: message,
-          });
-
-          return;
-        }
-
-        apply(
-          result.data,
-          set,
-        );
-      } catch (error) {
+      if (!result.ok) {
         set({
           loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to load cart.",
+          error: result.message ?? "Failed to load cart.",
         });
-      }
-    },
-
-    /* ───────────────────────────────────────────────────────────────
-       Add to cart
-       ─────────────────────────────────────────────────────────────── */
-
-    addToCart: async (
-      input,
-    ) => {
-      const quantity =
-        Math.max(
-          1,
-          Number(
-            input.quantity ?? 1,
-          ),
-        );
-
-      const variantId =
-        input.variantId !==
-          undefined &&
-        input.variantId !== null
-          ? Number(
-              input.variantId,
-            )
-          : undefined;
-
-      if (
-        variantId ===
-          undefined ||
-        !Number.isFinite(
-          variantId,
-        )
-      ) {
-        const message =
-          "Please select a product variant before adding to cart.";
-
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
+        return;
       }
 
+      apply(result.data, set);
+    } catch (error) {
       set({
-        loading: true,
-        error: null,
-      });
-
-      try {
-        // productVariantId + quantity only. The backend add-item DTO does
-        // not accept productId; input.productId stays local for metadata.
-        const result =
-          await addItemToCart(
-            variantId,
-            quantity,
-          );
-
-        if (!result.ok) {
-          const message =
-            result.message ??
-            "Failed to add item to cart.";
-
-          set({
-            loading: false,
-            error: message,
-          });
-
-          return {
-            ok: false,
-            message,
-          };
-        }
-
-        /**
-         * Find the cart row returned by
-         * the backend.
-         */
-        const returnedItem =
-          result.data.items.find(
-            (item) =>
-              Number(
-                item.productId,
-              ) ===
-                Number(
-                  input.productId,
-                ) &&
-              Number(
-                item.productVariantId,
-              ) ===
-                Number(
-                  variantId,
-                ),
-          );
-
-        /**
-         * Save only real product metadata.
-         *
-         * No placeholder/mock image is
-         * generated here.
-         */
-        if (returnedItem) {
-          saveItemMeta(
-            returnedItem.id,
-            {
-              slug: input.slug,
-              title: input.title,
-
-              ...(input.image?.trim()
-                ? {
-                    image:
-                      input.image.trim(),
-                  }
-                : {}),
-
-              variantId:
-                returnedItem.productVariantId,
-
-              variantLabel:
-                input.variantLabel,
-            },
-          );
-        }
-
-        apply(
-          result.data,
-          set,
-        );
-
-        return {
-          ok: true,
-        };
-      } catch (error) {
-        const message =
+        loading: false,
+        error:
           error instanceof Error
             ? error.message
-            : "Failed to add item to cart.";
-
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
-      }
-    },
-
-    /* ───────────────────────────────────────────────────────────────
-       Update quantity
-       ─────────────────────────────────────────────────────────────── */
-
-    updateQuantity: async (
-      rowId,
-      quantity,
-    ) => {
-      const safeQuantity =
-        Math.max(
-          1,
-          Math.floor(
-            Number(quantity),
-          ),
-        );
-
-      const numericRowId =
-        Number(rowId);
-
-      if (
-        !Number.isFinite(
-          numericRowId,
-        )
-      ) {
-        const message =
-          "Invalid cart item ID.";
-
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
-      }
-
-      set({
-        loading: true,
-        error: null,
+            : "Failed to load cart.",
       });
+    }
+  },
 
-      try {
-        const result =
-          await updateCartItem(
-            numericRowId,
-            safeQuantity,
-          );
+  addToCart: async (input) => {
+    const quantity = Math.max(1, Number(input.quantity ?? 1));
 
-        if (!result.ok) {
-          const message =
-            result.message ??
-            "Failed to update cart item.";
+    const variantId =
+      input.variantId !== undefined && input.variantId !== null
+        ? Number(input.variantId)
+        : undefined;
 
-          set({
-            loading: false,
-            error: message,
-          });
+    if (variantId === undefined || !Number.isFinite(variantId)) {
+      const message =
+        "Please select a product variant before adding to cart.";
 
-          return {
-            ok: false,
-            message,
-          };
-        }
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
 
-        apply(
-          result.data,
-          set,
-        );
+    set({ loading: true, error: null });
 
-        return {
-          ok: true,
-        };
-      } catch (error) {
+    try {
+      const result = await addItemToCart(variantId, quantity);
+
+      if (!result.ok) {
         const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to update cart item.";
+          result.message ?? "Failed to add item to cart.";
 
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
+        set({ loading: false, error: message });
+        return { ok: false, message };
       }
-    },
 
-    /* ───────────────────────────────────────────────────────────────
-       Remove item
-       ─────────────────────────────────────────────────────────────── */
+      const returnedItem = result.data.items.find(
+        (item) =>
+          Number(item.productId) === Number(input.productId) &&
+          Number(item.productVariantId) === Number(variantId),
+      );
 
-    removeFromCart: async (
-      rowId,
-    ) => {
-      const numericRowId =
-        Number(rowId);
+      if (returnedItem) {
+        saveItemMeta(returnedItem.id, {
+          slug: input.slug,
+          title: input.title,
+          ...(input.image?.trim()
+            ? { image: input.image.trim() }
+            : {}),
+          variantId: returnedItem.productVariantId,
+          variantLabel: input.variantLabel,
+        });
+      }
 
-      if (
-        !Number.isFinite(
-          numericRowId,
-        )
-      ) {
+      apply(result.data, set);
+      return { ok: true };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to add item to cart.";
+
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
+  },
+
+  updateQuantity: async (rowId, quantity) => {
+    const safeQuantity = Math.max(
+      1,
+      Math.floor(Number(quantity)),
+    );
+
+    const numericRowId = Number(rowId);
+
+    if (!Number.isFinite(numericRowId)) {
+      const message = "Invalid cart item ID.";
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
+
+    set({ loading: true, error: null });
+
+    try {
+      const result = await updateCartItem(
+        numericRowId,
+        safeQuantity,
+      );
+
+      if (!result.ok) {
         const message =
-          "Invalid cart item ID.";
+          result.message ?? "Failed to update cart item.";
 
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
+        set({ loading: false, error: message });
+        return { ok: false, message };
       }
 
-      set({
-        loading: true,
-        error: null,
-      });
+      apply(result.data, set);
+      return { ok: true };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update cart item.";
 
-      try {
-        const result =
-          await removeCartItem(
-            numericRowId,
-          );
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
+  },
 
-        if (!result.ok) {
-          const message =
-            result.message ??
-            "Failed to remove cart item.";
+  removeFromCart: async (rowId) => {
+    const numericRowId = Number(rowId);
 
-          set({
-            loading: false,
-            error: message,
-          });
+    if (!Number.isFinite(numericRowId)) {
+      const message = "Invalid cart item ID.";
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
 
-          return {
-            ok: false,
-            message,
-          };
-        }
+    set({ loading: true, error: null });
 
-        removeItemMeta(
-          numericRowId,
-        );
+    try {
+      const result = await removeCartItem(numericRowId);
 
-        apply(
-          result.data,
-          set,
-        );
-
-        return {
-          ok: true,
-        };
-      } catch (error) {
+      if (!result.ok) {
         const message =
-          error instanceof Error
-            ? error.message
-            : "Failed to remove cart item.";
+          result.message ?? "Failed to remove cart item.";
 
-        set({
-          loading: false,
-          error: message,
-        });
-
-        return {
-          ok: false,
-          message,
-        };
+        set({ loading: false, error: message });
+        return { ok: false, message };
       }
-    },
 
-    /* ───────────────────────────────────────────────────────────────
-       Clear cart
-       ─────────────────────────────────────────────────────────────── */
+      removeItemMeta(numericRowId);
+      apply(result.data, set);
+      return { ok: true };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to remove cart item.";
 
-    clearCart: async () => {
-      set({
-        loading: true,
-        error: null,
-      });
+      set({ loading: false, error: message });
+      return { ok: false, message };
+    }
+  },
 
-      try {
-        const result =
-          await clearServerCart();
+  clearCart: async () => {
+    set({ loading: true, error: null });
 
-        if (!result.ok) {
-          const message =
-            result.message ??
-            "Failed to clear cart.";
+    try {
+      const result = await clearServerCart();
 
-          set({
-            loading: false,
-            error: message,
-          });
+      if (!result.ok) {
+        const message =
+          result.message ?? "Failed to clear cart.";
 
-          throw new Error(
-            message,
-          );
-        }
-
-        if (
-          typeof window !==
-          "undefined"
-        ) {
-          try {
-            window.localStorage.removeItem(
-              META_STORAGE_KEY,
-            );
-          } catch {
-            // Ignore localStorage failures.
-          }
-        }
-
-        set({
-          items: [],
-          serverGrandTotal: 0,
-          serverTotalItems: 0,
-          serverProductPrice: 0,
-          serverTotalDiscount: 0,
-          loading: false,
-          error: null,
-        });
-      } catch (error) {
-        set({
-          loading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to clear cart.",
-        });
-
-        throw error;
+        set({ loading: false, error: message });
+        throw new Error(message);
       }
-    },
 
-    /* ───────────────────────────────────────────────────────────────
-       Local reset (logout / session expiry — no backend call)
-       ─────────────────────────────────────────────────────────────── */
-
-    resetLocal: () => {
       if (typeof window !== "undefined") {
         try {
           window.localStorage.removeItem(META_STORAGE_KEY);
@@ -804,84 +436,69 @@ const useCartStore =
         serverTotalItems: 0,
         serverProductPrice: 0,
         serverTotalDiscount: 0,
+        serverDeliveryCharge: 0,
         loading: false,
         error: null,
       });
-    },
-
-    /* ───────────────────────────────────────────────────────────────
-       Clear error
-       ─────────────────────────────────────────────────────────────── */
-
-    clearError: () => {
+    } catch (error) {
       set({
-        error: null,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to clear cart.",
       });
-    },
 
-    /* ───────────────────────────────────────────────────────────────
-       Increase quantity
-       ─────────────────────────────────────────────────────────────── */
+      throw error;
+    }
+  },
 
-    increaseQuantity: (rowId) => {
-      const line =
-        get().items.find(
-          (item) =>
-            String(item.id) ===
-            String(rowId),
-        );
+  resetLocal: () => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(META_STORAGE_KEY);
+      } catch {
+        // Ignore localStorage failures.
+      }
+    }
 
-      const next =
-        (line?.quantity ?? 0) + 1;
+    set({
+      items: [],
+      serverGrandTotal: 0,
+      serverTotalItems: 0,
+      serverProductPrice: 0,
+      serverTotalDiscount: 0,
+      serverDeliveryCharge: 0,
+      loading: false,
+      error: null,
+    });
+  },
 
-      void get().updateQuantity(
-        rowId,
-        next,
-      );
-    },
+  clearError: () => {
+    set({ error: null });
+  },
 
-    /* ───────────────────────────────────────────────────────────────
-       Decrease quantity
-       ─────────────────────────────────────────────────────────────── */
+  increaseQuantity: (rowId) => {
+    const line = get().items.find(
+      (item) => String(item.id) === String(rowId),
+    );
 
-    decreaseQuantity: (rowId) => {
-      const line =
-        get().items.find(
-          (item) =>
-            String(item.id) ===
-            String(rowId),
-        );
+    const next = (line?.quantity ?? 0) + 1;
+    void get().updateQuantity(rowId, next);
+  },
 
-      const next =
-        Math.max(
-          1,
-          (line?.quantity ?? 0) - 1,
-        );
+  decreaseQuantity: (rowId) => {
+    const line = get().items.find(
+      (item) => String(item.id) === String(rowId),
+    );
 
-      void get().updateQuantity(
-        rowId,
-        next,
-      );
-    },
+    const next = Math.max(1, (line?.quantity ?? 0) - 1);
+    void get().updateQuantity(rowId, next);
+  },
 
-    /* ───────────────────────────────────────────────────────────────
-       Total count
-       ─────────────────────────────────────────────────────────────── */
-
-    totalCount: () => {
-      return (
-        get().serverTotalItems ||
-        get().items.reduce(
-          (sum, item) =>
-            sum + item.quantity,
-          0,
-        )
-      );
-    },
-  }));
-
-/* ─────────────────────────────────────────────────────────────────────
-   Default export
-   ───────────────────────────────────────────────────────────────────── */
+  totalCount: () =>
+    get().serverTotalItems ||
+    get().items.reduce((sum, item) => sum + item.quantity, 0),
+}));
 
 export default useCartStore;
