@@ -10,7 +10,6 @@ import {
   CardContent,
   Divider,
   Grid,
-  Link as MuiLink,
   MenuItem,
   Stack,
   TextField,
@@ -30,8 +29,10 @@ import {
   submitKyc,
   updateKyc,
   uploadKycDocuments,
+  getKycDocumentSignedUrl,
   type BusinessType,
   type KycDocumentFiles,
+  type KycDocumentType,
   type SellerKycRequest,
   type SellerKycResponse,
 } from "@/services/sellerKycService";
@@ -65,7 +66,13 @@ const EMPTY_FORM = {
   country: "India",
 } satisfies SellerKycRequest;
 
-function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoField({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography
@@ -80,14 +87,103 @@ function InfoField({ label, value }: { label: string; value: React.ReactNode }) 
       >
         {label}
       </Typography>
-      <Typography variant="body1" sx={{ mt: 0.25, wordBreak: "break-word" }}>
+
+      <Typography
+        variant="body1"
+        sx={{ mt: 0.25, wordBreak: "break-word" }}
+      >
         {value}
       </Typography>
     </Box>
   );
 }
 
-function DocumentLink({ label, url }: { label: string; url?: string | null }) {
+/**
+ * Opens a KYC document using a short-lived signed URL generated
+ * by the authenticated backend.
+ *
+ * The stored Supabase object URL is used only to determine whether
+ * the document exists. It is not opened directly.
+ */
+function DocumentLink({
+  label,
+  documentType,
+  url,
+}: {
+  label: string;
+  documentType: KycDocumentType;
+  url?: string | null;
+}) {
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleOpen = async () => {
+    if (opening || !url) {
+      return;
+    }
+
+    setOpening(true);
+    setError(null);
+
+    // Open the tab immediately to avoid browser popup blocking.
+    const newTab = window.open("about:blank", "_blank");
+
+    if (!newTab) {
+      setOpening(false);
+      setError(
+        "Allow pop-ups in your browser to open this document."
+      );
+      return;
+    }
+
+    newTab.opener = null;
+
+    try {
+      const result = await getKycDocumentSignedUrl(documentType);
+
+      if (!result.ok) {
+        newTab.close();
+        setError(result.message || "Unable to open the document.");
+        return;
+      }
+
+      const signedUrl = result.data;
+
+      if (!signedUrl) {
+        newTab.close();
+        setError("The server did not return a document URL.");
+        return;
+      }
+
+      let parsedUrl: URL;
+
+      try {
+        parsedUrl = new URL(signedUrl);
+      } catch {
+        newTab.close();
+        setError("The document URL returned by the server is invalid.");
+        return;
+      }
+
+      // Only allow HTTPS URLs from this project's Supabase host.
+      if (
+        parsedUrl.protocol !== "https:" ||
+        parsedUrl.hostname !== "cbkyvodjqyiebtdexrrd.supabase.co"
+      ) {
+        newTab.close();
+        setError("The document URL is invalid.");
+        return;
+      }
+
+      newTab.location.href = parsedUrl.toString();
+    } catch {
+      newTab.close();
+      setError("Unable to open the document. Please try again.");
+    } finally {
+      setOpening(false);
+    }
+  };
+
   return (
     <Box>
       <Typography
@@ -103,13 +199,34 @@ function DocumentLink({ label, url }: { label: string; url?: string | null }) {
       >
         {label}
       </Typography>
+
       {url ? (
-        <MuiLink href={url} target="_blank" rel="noopener noreferrer" variant="body2">
-          View document
-        </MuiLink>
+        <Button
+          variant="text"
+          size="small"
+          onClick={() => void handleOpen()}
+          disabled={opening}
+          sx={{
+            px: 0,
+            minWidth: 0,
+            textTransform: "none",
+          }}
+        >
+          {opening ? "Opening document…" : "View document"}
+        </Button>
       ) : (
         <Typography variant="body2" color="text.secondary">
           Not uploaded
+        </Typography>
+      )}
+
+      {error && (
+        <Typography
+          variant="caption"
+          color="error"
+          sx={{ display: "block", mt: 0.5 }}
+        >
+          {error}
         </Typography>
       )}
     </Box>
@@ -128,7 +245,10 @@ export default function SellerKycPage() {
   const [notFound, setNotFound] = useState(false);
   const [mode, setMode] = useState<"view" | "edit">("view");
 
-  const [form, setForm] = useState<SellerKycRequest>({ ...EMPTY_FORM });
+  const [form, setForm] = useState<SellerKycRequest>({
+    ...EMPTY_FORM,
+  });
+
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -152,8 +272,7 @@ export default function SellerKycPage() {
     if (!res.ok) {
       setLoading(false);
 
-      // A missing seller KYC record is a normal first-time state and is
-      // represented by HTTP 404. Other failures remain real API errors.
+      // A missing KYC record is a normal first-time state.
       if (res.status === 404) {
         setKyc(null);
         setForm({ ...EMPTY_FORM });
@@ -162,6 +281,7 @@ export default function SellerKycPage() {
       } else {
         setLoadError(res.message);
       }
+
       return;
     }
 
@@ -179,7 +299,10 @@ export default function SellerKycPage() {
     let cancelled = false;
 
     const run = async () => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
+
       await load();
     };
 
@@ -191,7 +314,9 @@ export default function SellerKycPage() {
   }, [hasHydrated, isAuthenticated, load]);
 
   const startEditing = () => {
-    if (!kyc) return;
+    if (!kyc) {
+      return;
+    }
 
     setForm({
       businessType: kyc.businessType,
@@ -200,84 +325,111 @@ export default function SellerKycPage() {
       registrationNumber: kyc.registrationNumber ?? "",
       ownerName: kyc.ownerName ?? "",
       panNumber: kyc.panNumber ?? "",
-      // Aadhaar is masked by the backend; never prefill a masked value.
+
+      // Aadhaar is masked by the backend.
+      // Never prefill the masked value into the editable field.
       aadhaarNumber: "",
+
       businessAddress: kyc.businessAddress ?? "",
       city: kyc.city ?? "",
       state: kyc.state ?? "",
       postalCode: kyc.postalCode ?? "",
       country: kyc.country ?? "India",
     });
+
     setFormError(null);
     setSaveError(null);
     setSaveSuccess(null);
     setMode("edit");
   };
 
-const validate = (): string | null => {
-  if (!form.businessType) return "Business type is required.";
+  const validate = (): string | null => {
+    if (!form.businessType) {
+      return "Business type is required.";
+    }
 
-  if (!form.dateOfBirth) {
-    return "Date of birth is required.";
-  }
+    if (!form.dateOfBirth) {
+      return "Date of birth is required.";
+    }
 
-  const dateOfBirthPattern = /^\d{4}-\d{2}-\d{2}$/;
+    const dateOfBirthPattern = /^\d{4}-\d{2}-\d{2}$/;
 
-  if (!dateOfBirthPattern.test(form.dateOfBirth)) {
-    return "Invalid date of birth.";
-  }
+    if (!dateOfBirthPattern.test(form.dateOfBirth)) {
+      return "Invalid date of birth.";
+    }
 
-  const today = new Date();
+    const today = new Date();
 
-  const todayIso = [
-    today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    String(today.getDate()).padStart(2, "0"),
-  ].join("-");
+    const todayIso = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
 
-  if (form.dateOfBirth >= todayIso) {
-    return "Date of birth must be in the past.";
-  }
+    if (form.dateOfBirth >= todayIso) {
+      return "Date of birth must be in the past.";
+    }
 
-  if (!form.ownerName.trim()) return "Owner name is required.";
+    if (!form.ownerName.trim()) {
+      return "Owner name is required.";
+    }
 
-  const pan = form.panNumber.trim().toUpperCase();
-  if (!pan) return "PAN number is required.";
-  if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
-    return "Invalid PAN number.";
-  }
+    const pan = form.panNumber.trim().toUpperCase();
 
-  const gst = form.gstNumber?.trim().toUpperCase() ?? "";
-  if (gst && !/^[0-9A-Z]{15}$/.test(gst)) {
-    return "Invalid GST number.";
-  }
+    if (!pan) {
+      return "PAN number is required.";
+    }
 
-  const aadhaar = form.aadhaarNumber?.trim() ?? "";
-  if (aadhaar && !/^\d{12}$/.test(aadhaar)) {
-    return "Aadhaar number must be 12 digits.";
-  }
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+      return "Invalid PAN number.";
+    }
 
-  if (!form.businessAddress.trim()) {
-    return "Business address is required.";
-  }
+    const gst = form.gstNumber?.trim().toUpperCase() ?? "";
 
-  if (!form.city.trim()) return "City is required.";
-  if (!form.state.trim()) return "State is required.";
-  if (!form.postalCode.trim()) return "Postal code is required.";
+    if (gst && !/^[0-9A-Z]{15}$/.test(gst)) {
+      return "Invalid GST number.";
+    }
 
-  if (form.postalCode.trim().length > 10) {
-    return "Postal code must not exceed 10 characters.";
-  }
+    const aadhaar = form.aadhaarNumber?.trim() ?? "";
 
-  if (!form.country.trim()) return "Country is required.";
+    if (aadhaar && !/^\d{12}$/.test(aadhaar)) {
+      return "Aadhaar number must be 12 digits.";
+    }
 
-  return null;
-};
+    if (!form.businessAddress.trim()) {
+      return "Business address is required.";
+    }
+
+    if (!form.city.trim()) {
+      return "City is required.";
+    }
+
+    if (!form.state.trim()) {
+      return "State is required.";
+    }
+
+    if (!form.postalCode.trim()) {
+      return "Postal code is required.";
+    }
+
+    if (form.postalCode.trim().length > 10) {
+      return "Postal code must not exceed 10 characters.";
+    }
+
+    if (!form.country.trim()) {
+      return "Country is required.";
+    }
+
+    return null;
+  };
 
   const handleSubmit = async () => {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
 
     const validationError = validate();
+
     if (validationError) {
       setFormError(validationError);
       return;
@@ -292,7 +444,8 @@ const validate = (): string | null => {
       businessType: form.businessType,
       dateOfBirth: form.dateOfBirth,
       gstNumber: form.gstNumber?.trim().toUpperCase() || undefined,
-      registrationNumber: form.registrationNumber?.trim() || undefined,
+      registrationNumber:
+        form.registrationNumber?.trim() || undefined,
       ownerName: form.ownerName.trim(),
       panNumber: form.panNumber.trim().toUpperCase(),
       aadhaarNumber: form.aadhaarNumber?.trim() || undefined,
@@ -303,7 +456,9 @@ const validate = (): string | null => {
       country: form.country.trim(),
     };
 
-    const res = kyc ? await updateKyc(payload) : await submitKyc(payload);
+    const res = kyc
+      ? await updateKyc(payload)
+      : await submitKyc(payload);
 
     if (!res.ok) {
       setSaving(false);
@@ -314,10 +469,15 @@ const validate = (): string | null => {
     setKyc(res.data);
     setSaving(false);
     setMode("view");
-    setSaveSuccess("KYC details saved. Verification is now pending review.");
+    setSaveSuccess(
+      "KYC details saved. Verification is now pending review."
+    );
   };
 
-  const setDocument = (key: keyof KycDocumentFiles, file: File | null) => {
+  const setDocument = (
+    key: keyof KycDocumentFiles,
+    file: File | null
+  ) => {
     setDocError(null);
     setDocSuccess(null);
 
@@ -326,17 +486,23 @@ const validate = (): string | null => {
         setDocError("Only PDF documents are allowed.");
         return;
       }
+
       if (file.size > MAX_DOCUMENT_BYTES) {
         setDocError("Each document must not exceed 2 MB.");
         return;
       }
     }
 
-    setDocuments((prev) => ({ ...prev, [key]: file }));
+    setDocuments((prev) => ({
+      ...prev,
+      [key]: file,
+    }));
   };
 
   const handleUpload = async () => {
-    if (uploading) return;
+    if (uploading) {
+      return;
+    }
 
     const hasAny = Object.values(documents).some(Boolean);
 
@@ -361,7 +527,9 @@ const validate = (): string | null => {
     setDocuments({});
     setDocumentsFieldKey((key) => key + 1);
     setUploading(false);
-    setDocSuccess("Documents uploaded. Verification is now pending review.");
+    setDocSuccess(
+      "Documents uploaded. Verification is now pending review."
+    );
   };
 
   if (loading) {
@@ -387,16 +555,18 @@ const validate = (): string | null => {
       />
 
       <Stack spacing={3}>
-        {saveSuccess && <Alert severity="success">{saveSuccess}</Alert>}
+        {saveSuccess && (
+          <Alert severity="success">{saveSuccess}</Alert>
+        )}
 
         {notFound && (
           <Alert severity="info">
-            No KYC record was found for your account. Submit your details below
-            to begin verification.
+            No KYC record was found for your account. Submit your details
+            below to begin verification.
           </Alert>
         )}
 
-        {/* ── Status ────────────────────────────────────────────────── */}
+        {/* Status */}
         {kyc && (
           <Card>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
@@ -410,9 +580,13 @@ const validate = (): string | null => {
                 }}
               >
                 <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 700, mb: 0.5 }}
+                  >
                     Verification status
                   </Typography>
+
                   <StatusChip status={kyc.status} />
                 </Box>
 
@@ -441,12 +615,23 @@ const validate = (): string | null => {
                 </Alert>
               )}
 
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-                Submitted: {kyc.submittedAt ? new Date(kyc.submittedAt).toLocaleString() : "—"}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 2 }}
+              >
+                Submitted:{" "}
+                {kyc.submittedAt
+                  ? new Date(kyc.submittedAt).toLocaleString()
+                  : "—"}
               </Typography>
 
               {kyc.reviewedAt && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block" }}
+                >
                   Reviewed: {new Date(kyc.reviewedAt).toLocaleString()}
                 </Typography>
               )}
@@ -454,80 +639,159 @@ const validate = (): string | null => {
           </Card>
         )}
 
-        {/* ── View details ──────────────────────────────────────────── */}
+        {/* View details */}
         {kyc && mode === "view" && (
           <Card>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 2.5 }}>
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 700, mb: 2.5 }}
+              >
                 Submitted information
               </Typography>
 
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="Business type" value={BUSINESS_TYPES.find((b) => b.value === kyc.businessType)?.label ?? kyc.businessType} />
+                  <InfoField
+                    label="Business type"
+                    value={
+                      BUSINESS_TYPES.find(
+                        (b) => b.value === kyc.businessType
+                      )?.label ?? kyc.businessType
+                    }
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="Owner name" value={kyc.ownerName || "—"} />
+                  <InfoField
+                    label="Owner name"
+                    value={kyc.ownerName || "—"}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <InfoField
                     label="Date of birth"
                     value={kyc.dateOfBirth || "—"}
                   />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="PAN number" value={kyc.panNumber || "—"} />
+                  <InfoField
+                    label="PAN number"
+                    value={kyc.panNumber || "—"}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="Aadhaar number" value={kyc.aadhaarNumber || "—"} />
+                  <InfoField
+                    label="Aadhaar number"
+                    value={kyc.aadhaarNumber || "—"}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="GST number" value={kyc.gstNumber || "—"} />
+                  <InfoField
+                    label="GST number"
+                    value={kyc.gstNumber || "—"}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <InfoField label="Registration number" value={kyc.registrationNumber || "—"} />
+                  <InfoField
+                    label="Registration number"
+                    value={kyc.registrationNumber || "—"}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12 }}>
-                  <InfoField label="Business address" value={[kyc.businessAddress, kyc.city, kyc.state, kyc.postalCode, kyc.country].filter(Boolean).join(", ") || "—"} />
+                  <InfoField
+                    label="Business address"
+                    value={
+                      [
+                        kyc.businessAddress,
+                        kyc.city,
+                        kyc.state,
+                        kyc.postalCode,
+                        kyc.country,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "—"
+                    }
+                  />
                 </Grid>
               </Grid>
 
               <Divider sx={{ my: 3 }} />
 
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, mb: 2 }}
+              >
                 Documents
               </Typography>
 
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <DocumentLink label="PAN document" url={kyc.panDocumentUrl} />
+                  <DocumentLink
+                    label="PAN document"
+                    documentType="pan"
+                    url={kyc.panDocumentUrl}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <DocumentLink label="Aadhaar document" url={kyc.aadhaarDocumentUrl} />
+                  <DocumentLink
+                    label="Aadhaar document"
+                    documentType="aadhaar"
+                    url={kyc.aadhaarDocumentUrl}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <DocumentLink label="GST document" url={kyc.gstDocumentUrl} />
+                  <DocumentLink
+                    label="GST document"
+                    documentType="gst"
+                    url={kyc.gstDocumentUrl}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <DocumentLink label="Registration document" url={kyc.registrationDocumentUrl} />
+                  <DocumentLink
+                    label="Registration document"
+                    documentType="registration"
+                    url={kyc.registrationDocumentUrl}
+                  />
                 </Grid>
+
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <DocumentLink label="Address document" url={kyc.addressDocumentUrl} />
+                  <DocumentLink
+                    label="Address document"
+                    documentType="address"
+                    url={kyc.addressDocumentUrl}
+                  />
                 </Grid>
               </Grid>
             </CardContent>
           </Card>
         )}
 
-        {/* ── Edit / submit form ────────────────────────────────────── */}
+        {/* Edit / submit form */}
         {mode === "edit" && (
           <Card>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 700, mb: 0.5 }}
+              >
                 {kyc ? "Edit KYC details" : "Submit KYC details"}
               </Typography>
 
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 2.5 }}
+              >
                 Fields marked with * are required.
               </Typography>
 
@@ -543,257 +807,277 @@ const validate = (): string | null => {
                 </Alert>
               )}
 
-<Grid container spacing={2}>
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      select
-      fullWidth
-      required
-      label="Business type"
-      value={form.businessType}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          businessType: e.target.value as BusinessType,
-        })
-      }
-      disabled={saving}
-    >
-      {BUSINESS_TYPES.map((b) => (
-        <MenuItem key={b.value} value={b.value}>
-          {b.label}
-        </MenuItem>
-      ))}
-    </TextField>
-  </Grid>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    required
+                    label="Business type"
+                    value={form.businessType}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        businessType: e.target.value as BusinessType,
+                      })
+                    }
+                    disabled={saving}
+                  >
+                    {BUSINESS_TYPES.map((b) => (
+                      <MenuItem key={b.value} value={b.value}>
+                        {b.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      required
-      label="Owner name"
-      value={form.ownerName}
-      onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
-      disabled={saving}
-      slotProps={{ htmlInput: { maxLength: 150 } }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Owner name"
+                    value={form.ownerName}
+                    onChange={(e) =>
+                      setForm({ ...form, ownerName: e.target.value })
+                    }
+                    disabled={saving}
+                    slotProps={{ htmlInput: { maxLength: 150 } }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      required
-      type="date"
-      label="Date of birth"
-      value={form.dateOfBirth}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          dateOfBirth: e.target.value,
-        })
-      }
-      disabled={saving}
-      slotProps={{
-        inputLabel: {
-          shrink: true,
-        },
-        htmlInput: {
-          max: new Date().toISOString().split("T")[0],
-        },
-      }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    type="date"
+                    label="Date of birth"
+                    value={form.dateOfBirth}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        dateOfBirth: e.target.value,
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{
+                      inputLabel: { shrink: true },
+                      htmlInput: {
+                        max: new Date().toISOString().split("T")[0],
+                      },
+                    }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      required
-      label="PAN number"
-      value={form.panNumber}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          panNumber: e.target.value.toUpperCase(),
-        })
-      }
-      disabled={saving}
-      slotProps={{
-        htmlInput: {
-          maxLength: 10,
-          style: { textTransform: "uppercase" },
-        },
-      }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="PAN number"
+                    value={form.panNumber}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        panNumber: e.target.value.toUpperCase(),
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{
+                      htmlInput: {
+                        maxLength: 10,
+                        style: { textTransform: "uppercase" },
+                      },
+                    }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      label="Aadhaar number"
-      helperText={
-        kyc
-          ? "Stored masked. Re-enter 12 digits to keep it, or leave blank."
-          : "Optional"
-      }
-      value={form.aadhaarNumber}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          aadhaarNumber: e.target.value.replace(/\D/g, ""),
-        })
-      }
-      disabled={saving}
-      slotProps={{
-        htmlInput: {
-          maxLength: 12,
-          inputMode: "numeric",
-        },
-      }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Aadhaar number"
+                    helperText={
+                      kyc
+                        ? "Stored masked. Re-enter 12 digits to keep it, or leave blank."
+                        : "Optional"
+                    }
+                    value={form.aadhaarNumber}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        aadhaarNumber: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{
+                      htmlInput: {
+                        maxLength: 12,
+                        inputMode: "numeric",
+                      },
+                    }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      label="GST number"
-      helperText="15 characters (optional)"
-      value={form.gstNumber}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          gstNumber: e.target.value.toUpperCase(),
-        })
-      }
-      disabled={saving}
-      slotProps={{ htmlInput: { maxLength: 15 } }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="GST number"
+                    helperText="15 characters (optional)"
+                    value={form.gstNumber}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        gstNumber: e.target.value.toUpperCase(),
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{ htmlInput: { maxLength: 15 } }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      label="Registration number"
-      value={form.registrationNumber}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          registrationNumber: e.target.value,
-        })
-      }
-      disabled={saving}
-      slotProps={{ htmlInput: { maxLength: 100 } }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    label="Registration number"
+                    value={form.registrationNumber}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        registrationNumber: e.target.value,
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{ htmlInput: { maxLength: 100 } }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12 }}>
-    <TextField
-      fullWidth
-      required
-      label="Business address"
-      multiline
-      minRows={2}
-      value={form.businessAddress}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          businessAddress: e.target.value,
-        })
-      }
-      disabled={saving}
-      slotProps={{ htmlInput: { maxLength: 500 } }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Business address"
+                    multiline
+                    minRows={2}
+                    value={form.businessAddress}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        businessAddress: e.target.value,
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{ htmlInput: { maxLength: 500 } }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 5 }}>
-    <TextField
-      fullWidth
-      required
-      label="City"
-      value={form.city}
-      onChange={(e) => setForm({ ...form, city: e.target.value })}
-      disabled={saving}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 5 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="City"
+                    value={form.city}
+                    onChange={(e) =>
+                      setForm({ ...form, city: e.target.value })
+                    }
+                    disabled={saving}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 4 }}>
-    <TextField
-      fullWidth
-      required
-      label="State"
-      value={form.state}
-      onChange={(e) => setForm({ ...form, state: e.target.value })}
-      disabled={saving}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="State"
+                    value={form.state}
+                    onChange={(e) =>
+                      setForm({ ...form, state: e.target.value })
+                    }
+                    disabled={saving}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 3 }}>
-    <TextField
-      fullWidth
-      required
-      label="Postal code"
-      value={form.postalCode}
-      onChange={(e) =>
-        setForm({
-          ...form,
-          postalCode: e.target.value,
-        })
-      }
-      disabled={saving}
-      slotProps={{ htmlInput: { maxLength: 10 } }}
-    />
-  </Grid>
+                <Grid size={{ xs: 12, sm: 3 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Postal code"
+                    value={form.postalCode}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        postalCode: e.target.value,
+                      })
+                    }
+                    disabled={saving}
+                    slotProps={{ htmlInput: { maxLength: 10 } }}
+                  />
+                </Grid>
 
-  <Grid size={{ xs: 12, sm: 6 }}>
-    <TextField
-      fullWidth
-      required
-      label="Country"
-      value={form.country}
-      onChange={(e) => setForm({ ...form, country: e.target.value })}
-      disabled={saving}
-    />
-  </Grid>
-</Grid>
+                <Grid size={{ xs: 12, sm: 6 }}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Country"
+                    value={form.country}
+                    onChange={(e) =>
+                      setForm({ ...form, country: e.target.value })
+                    }
+                    disabled={saving}
+                  />
+                </Grid>
+              </Grid>
 
-<Stack
-  direction={{ xs: "column", sm: "row" }}
-  spacing={1.5}
-  sx={{ mt: 3, alignItems: { xs: "stretch", sm: "center" } }}
->
-  <Button
-    variant="contained"
-    onClick={() => void handleSubmit()}
-    disabled={saving}
-    sx={{ minHeight: 44 }}
-  >
-    {saving ? "Saving…" : kyc ? "Save changes" : "Submit KYC"}
-  </Button>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.5}
+                sx={{
+                  mt: 3,
+                  alignItems: { xs: "stretch", sm: "center" },
+                }}
+              >
+                <Button
+                  variant="contained"
+                  onClick={() => void handleSubmit()}
+                  disabled={saving}
+                  sx={{ minHeight: 44 }}
+                >
+                  {saving
+                    ? "Saving…"
+                    : kyc
+                      ? "Save changes"
+                      : "Submit KYC"}
+                </Button>
 
-  {kyc && (
-    <Button
-      onClick={() => setMode("view")}
-      disabled={saving}
-      sx={{ minHeight: 44 }}
-    >
-      Cancel
-    </Button>
-  )}
-</Stack>
+                {kyc && (
+                  <Button
+                    onClick={() => setMode("view")}
+                    disabled={saving}
+                    sx={{ minHeight: 44 }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </Stack>
             </CardContent>
           </Card>
         )}
 
-        {/* ── Document upload ───────────────────────────────────────── */}
+        {/* Document upload */}
         {kyc && !isVerified && mode === "view" && (
           <Card>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 700, mb: 0.5 }}
+              >
                 Upload documents
               </Typography>
 
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-                PDF only, up to 2 MB per document. Uploading documents resets
-                your KYC to pending review.
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 2.5 }}
+              >
+                PDF only, up to 2 MB per document. Uploading documents
+                resets your KYC to pending review.
               </Typography>
 
               {docError && (
@@ -820,7 +1104,7 @@ const validate = (): string | null => {
                 ).map(([key, label]) => (
                   <Grid size={{ xs: 12, sm: 6 }} key={key}>
                     <TextField
-                      key={documentsFieldKey}
+                      key={`${documentsFieldKey}-${key}`}
                       fullWidth
                       type="file"
                       label={label}
