@@ -8,7 +8,7 @@ import {
   Button,
   Stack,
 } from "@mui/material";
-import LocalOfferIcon from "@mui/icons-material/LocalOffer";
+import { formatPrice } from "@/utils/formatPrice";
 
 import { getProductImage } from "@/utils/productImages";
 import type { Product } from "@/types/product";
@@ -20,28 +20,29 @@ interface Props {
 /**
  * HAVLOOK — Home hero banner.
  *
- * Receives a backend-sourced product as a prop and renders the
- * existing banner visual. The product slug drives the CTA
+ * Receives a backend-sourced product as a prop and renders a
+ * premium-minimalist banner. The product slug drives the CTA
  * navigation.
  *
  * This is a client component because MUI's Button uses the
  * Next.js Link component through the component prop.
  */
 export default function Hero({ product }: Props) {
-  const offerPrice = product.price.toLocaleString("en-IN");
+  const title = product.title?.trim() || "Discover something you'll love";
+  const description =
+    product.description?.trim() ||
+    "Explore this product and discover more from our collection.";
 
-  const originalPrice = (
-    product.originalPrice ?? product.price
-  ).toLocaleString("en-IN");
-
-  const discountPct =
-    product.originalPrice && product.originalPrice > product.price
-      ? Math.round(
-          ((product.originalPrice - product.price) /
-            product.originalPrice) *
-            100,
-        )
-      : 0;
+  const offerPrice = formatPrice(product.price);
+  const originalPrice = formatPrice(
+    product.originalPrice ?? product.price,
+  );
+  const discountPct = product.discount
+    ? Math.round(
+        ((product.originalPrice ?? product.price) - product.price) /
+          (product.originalPrice ?? product.price) * 100,
+      )
+    : 0;
 
   const image = getProductImage(product);
 
@@ -51,14 +52,11 @@ export default function Hero({ product }: Props) {
       aria-label="Featured offer"
       sx={{
         width: "100%",
-        bgcolor: "secondary.main",
-        backgroundImage:
-          "radial-gradient(120% 160% at 85% 0%, rgba(241, 90, 41, 0.28) 0%, rgba(241, 90, 41, 0) 55%)",
-        color: "#F4EFE6",
-        mt: { xs: 1, md: 2 },
-        borderRadius: { xs: 0, md: 3 },
+        bgcolor: "background.paper",
+        color: "text.primary",
+        mt: { xs: 2, md: 3 },
+        borderRadius: 3,
         overflow: "hidden",
-        position: "relative",
       }}
     >
       <Box
@@ -91,74 +89,37 @@ export default function Hero({ product }: Props) {
             },
           }}
         >
-          <Stack
-            direction="row"
-            spacing={0.75}
-            sx={{
-              alignItems: "center",
-              bgcolor: "rgba(241, 90, 41, 0.16)",
-              border: "1px solid rgba(241, 90, 41, 0.35)",
-              borderRadius: 100,
-              px: 1.25,
-              py: 0.4,
-            }}
-          >
-            <LocalOfferIcon
-              sx={{
-                fontSize: 16,
-                color: "primary.main",
-              }}
-            />
-
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                lineHeight: 1.2,
-                color: "#F8B5A0",
-              }}
-            >
-              Limited-time offer
-            </Typography>
-          </Stack>
-
           <Typography
-            component="h1"
+            variant="h5"
             sx={{
+              fontWeight: 700,
               fontSize: {
-                xs: "1.4rem",
-                sm: "1.65rem",
+                xs: "1.25rem",
+                sm: "1.5rem",
                 md: "2rem",
               },
-              fontWeight: 800,
-              lineHeight: 1.18,
-              letterSpacing: "-0.02em",
-              color: "#FFFFFF",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              lineHeight: 1.3,
+              letterSpacing: "-0.01em",
+              color: "text.primary",
+              mb: 1,
             }}
           >
-            {product.title}
+            {title}
           </Typography>
 
           <Typography
+            variant="body2"
             sx={{
               fontSize: {
-                xs: "0.8125rem",
-                md: "0.9375rem",
+                xs: "0.875rem",
+                md: "1rem",
               },
               lineHeight: 1.6,
-              color: "rgba(244, 239, 230, 0.75)",
+              color: "text.secondary",
               maxWidth: 440,
-              display: "-webkit-box",
-              WebkitLineClamp: { xs: 2, md: 3 },
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
             }}
           >
-            {product.description}
+            {description}
           </Typography>
 
           <Stack
@@ -175,68 +136,53 @@ export default function Hero({ product }: Props) {
               },
             }}
           >
+            {discountPct > 0 && (
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.3,
+                  bgcolor: "action.hover",
+                  color: "primary.main",
+                  px: 1,
+                  py: 0.3,
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontSize: "0.75rem",
+                }}
+              >
+                {discountPct}% OFF
+              </Box>
+            )}
+
             <Typography
               sx={{
+                fontWeight: 600,
                 fontSize: {
                   xs: "1.5rem",
                   md: "1.875rem",
                 },
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
-                color: "#FFFFFF",
+                color: "primary.main",
               }}
             >
-              ₹{offerPrice}
+              {offerPrice}
             </Typography>
 
             {product.originalPrice &&
               product.originalPrice > product.price && (
               <Typography
-                variant="body1"
+                variant="body2"
                 sx={{
-                  color: "rgba(244, 239, 230, 0.5)",
+                  color: "text.secondary",
                   textDecoration: "line-through",
+                  fontSize: "0.875rem",
+                  mr: 1,
                 }}
               >
-                ₹{originalPrice}
+                {originalPrice}
               </Typography>
               )}
 
-            {discountPct > 0 && (
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: 800,
-                  color: "#FFFFFF",
-                  bgcolor: "primary.main",
-                  px: 1,
-                  py: 0.3,
-                  borderRadius: 1,
-                  letterSpacing: "0.02em",
-                }}
-              >
-                {discountPct}% OFF
-              </Typography>
-            )}
-          </Stack>
-
-          {/* CTA buttons */}
-          <Stack
-            direction="row"
-            spacing={1.5}
-            sx={{
-              pt: 1,
-              alignItems: {
-                xs: "center",
-                md: "flex-start",
-              },
-              flexWrap: "wrap",
-              justifyContent: {
-                xs: "center",
-                md: "flex-start",
-              },
-            }}
-          >
             <Button
               component={Link}
               href={`/products/${product.slug}`}
@@ -248,28 +194,10 @@ export default function Hero({ product }: Props) {
                 px: 3,
                 minHeight: 44,
                 borderRadius: 2,
+                mt: 1,
               }}
             >
               Shop now
-            </Button>
-
-            <Button
-              component={Link}
-              href="/products"
-              variant="text"
-              size="large"
-              sx={{
-                color: "#F4EFE6",
-                fontWeight: 600,
-                minHeight: 44,
-                borderRadius: 2,
-                px: 2,
-                "&:hover": {
-                  bgcolor: "rgba(244, 239, 230, 0.1)",
-                },
-              }}
-            >
-              View all deals
             </Button>
           </Stack>
         </Stack>
@@ -279,20 +207,15 @@ export default function Hero({ product }: Props) {
           sx={{
             position: "relative",
             height: { xs: 190, sm: 230, md: 260 },
-            borderRadius: { xs: 2, md: 3 },
+            borderRadius: 3,
             bgcolor: "background.paper",
-            backgroundImage:
-              "radial-gradient(80% 80% at 50% 30%, rgba(241, 90, 41, 0.08) 0%, rgba(241, 90, 41, 0) 70%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             overflow: "hidden",
-            boxShadow: 3,
+            boxShadow: 1,
           }}
         >
           <Image
             src={image}
-            alt={product.title}
+            alt={title}
             fill
             priority
             sizes="(max-width: 900px) 100vw, 540px"
