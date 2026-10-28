@@ -1,9 +1,26 @@
 const DEFAULT_BASE_URL = "http://localhost:8080";
+const ANDROID_EMULATOR_BASE_URL = "http://10.0.2.2:8080";
 
 function resolveBaseUrl(): string {
+  // Capacitor development server runs on the host and is opened
+  // in Android WebView at 10.0.2.2:3000. Route its browser-side
+  // API calls back to the host backend at 10.0.2.2:8080.
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname === "10.0.2.2"
+  ) {
+    return ANDROID_EMULATOR_BASE_URL;
+  }
+
   const fromEnv =
-    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_BASE_URL : undefined;
-  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/+$/, "");
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_API_BASE_URL
+      : undefined;
+
+  if (fromEnv && fromEnv.trim()) {
+    return fromEnv.replace(/\/+$/, "");
+  }
+
   return DEFAULT_BASE_URL;
 }
 

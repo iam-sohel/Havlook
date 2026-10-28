@@ -106,6 +106,7 @@ for (const hostname of remoteHostnames) {
 }
 
 const nextConfig = {
+  allowedDevOrigins: ["10.0.2.2"],
   turbopack: {
     root: decodeURIComponent(new URL(".", import.meta.url).pathname).replace(
       /^\/([A-Za-z]:\/)/,
