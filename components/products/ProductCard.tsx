@@ -26,6 +26,7 @@ import useAuthStore from "@/store/authStore";
 import { useAuthHydrated } from "@/hooks/useAuthHydrated";
 import { formatPrice } from "@/utils/formatPrice";
 import { formatCount } from "@/utils/formatAmount";
+import { normalizeProductImageUrl } from "@/utils/normalizeProductImage";
 
 const UNIVERSAL_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23F3F1EC'/%3E%3Cpath d='M120 280l55-65 40 45 30-35 55 55H120z' fill='%23c8c3b8'/%3E%3Ccircle cx='255' cy='145' r='25' fill='%23c8c3b8'/%3E%3C/svg%3E";
@@ -60,6 +61,8 @@ export default function ProductCard({
   newArrival = false,
 }: ProductCardProps) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
+
+  const normalizedImage = normalizeProductImageUrl(image);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [notice, setNotice] = useState<{
     open: boolean;
@@ -69,7 +72,7 @@ export default function ProductCard({
 
   // Derive the image from the current prop so a product change never
   // keeps the previous product's fallback state.
-  const resolvedImage = failedImage === image ? UNIVERSAL_FALLBACK : image;
+  const resolvedImage = failedImage === normalizedImage ? UNIVERSAL_FALLBACK : normalizedImage;
 
   const router = useRouter();
 
@@ -146,8 +149,8 @@ export default function ProductCard({
    * image doesn't break the product grid.
    */
   const handleImageError = () => {
-    if (image !== UNIVERSAL_FALLBACK) {
-      setFailedImage(image);
+    if (normalizedImage !== UNIVERSAL_FALLBACK) {
+      setFailedImage(normalizedImage);
     }
   };
 

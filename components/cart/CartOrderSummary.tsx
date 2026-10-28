@@ -62,7 +62,7 @@ export default function CartOrderSummary({
   const safeItemCount = toSafeNumber(itemCount);
 
   const showDiscount = safeTotalDiscount > 0;
-  const totalPayable = safeOrderTotal + safeDeliveryCharge;
+  const totalPayable = safeOrderTotal;
 
   return (
     <Box
@@ -248,7 +248,7 @@ export default function CartOrderSummary({
             Delivery charge
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Calculated from your order total
+            Calculated at checkout
           </Typography>
         </Box>
 

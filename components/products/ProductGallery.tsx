@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
 
 import { Box, IconButton, Stack } from "@mui/material";
@@ -8,6 +8,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 
 import type { ProductImage } from "@/types/product";
+import { normalizeProductImageUrl } from "@/utils/normalizeProductImage";
 
 interface ProductGalleryProps {
   title: string;
@@ -58,7 +59,6 @@ function GalleryInner({
   title,
   images,
 }: ProductGalleryProps) {
-  const safeImages = images && images.length > 0 ? images : [];
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [failedIds, setFailedIds] = useState<Set<string | number>>(
     () => new Set(),
@@ -66,8 +66,9 @@ function GalleryInner({
   const regionRef = useRef<HTMLDivElement | null>(null);
 
   // After image-failure filtering, build the visible list.
-  const visibleImages = safeImages.filter(
-    (img) => !failedIds.has(img.id),
+  const visibleImages = useMemo(
+    () => (images && images.length > 0 ? images : []).filter((img) => !failedIds.has(img.id)),
+    [images, failedIds],
   );
   const hasMultiple = visibleImages.length > 1;
   const currentIndex = Math.min(selectedIndex, visibleImages.length - 1);
@@ -182,7 +183,7 @@ function GalleryInner({
             }}
           >
             <Image
-              src={current.url}
+              src={normalizeProductImageUrl(current.url)}
               alt={current.alt ?? title}
               fill
               sizes="(max-width: 600px) 100vw, (max-width: 900px) 60vw, 560px"
@@ -337,7 +338,7 @@ function GalleryInner({
                   }}
                 >
                   <Image
-                    src={img.url}
+                    src={normalizeProductImageUrl(img.url)}
                     alt={img.alt ?? `${title} thumbnail ${index + 1}`}
                     fill
                     sizes="76px"

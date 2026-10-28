@@ -45,6 +45,9 @@ export interface CartResponseWire {
 
   /** Final payable cart total. */
   orderTotal: number;
+
+  /** Backend-calculated delivery charge. */
+  shippingCharge?: number;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -123,6 +126,8 @@ function normaliseCart(raw: CartResponseWire): CartResponseWire {
     totalDiscount: toNumber(raw.totalDiscount),
 
     orderTotal: toNumber(raw.orderTotal),
+
+    shippingCharge: toNumber(raw.shippingCharge),
   };
 }
 
