@@ -1,5 +1,6 @@
-import type { NextConfig } from "next";
-import { fileURLToPath } from "node:url";
+const process = (globalThis as typeof globalThis & {
+  process: { env: Record<string, string | undefined> };
+}).process;
 
 const remoteHostnames = (
     process.env.NEXT_PUBLIC_IMAGE_REMOTE_HOSTNAMES ?? ""
@@ -74,6 +75,11 @@ function localhostApiRemotePatterns(): RemotePattern[] {
 }
 
 const remotePatterns: RemotePattern[] = [
+  {
+    protocol: "https",
+    hostname: "m.media-amazon.com",
+    pathname: "/images/**",
+  },
   ...apiRemotePattern(),
 
   // Supabase Storage - product images
@@ -99,9 +105,12 @@ for (const hostname of remoteHostnames) {
   });
 }
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   turbopack: {
-    root: fileURLToPath(new URL(".", import.meta.url)),
+    root: decodeURIComponent(new URL(".", import.meta.url).pathname).replace(
+      /^\/([A-Za-z]:\/)/,
+      "$1",
+    ),
   },
 
   images: {
