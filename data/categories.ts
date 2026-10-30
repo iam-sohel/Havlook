@@ -58,7 +58,12 @@ const categories = [
     title: "Automotive",
     image: "/categories/automotive.png",
     slug: "automotive",
-  },
+  },{
+  id: 16,
+  title: "Home & Kitchen",
+  image: "/categories/Home.png",
+  slug: "home-kitchen",
+ },
 ];
 
 export default categories;

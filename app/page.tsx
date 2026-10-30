@@ -1,3 +1,4 @@
+
 import { Box, Typography, Container } from "@mui/material";
 
 import Header from "@/components/layout/Header";
@@ -10,39 +11,33 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { listProducts, enrichProductListWithDetails } from "@/services/productService";
+import { listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
  * HAVLOOK — Home page (Server Component).
  *
  * Backend is the single source of truth for product data.
- *
- * The full catalogue is fetched once via `listProducts()` (which hits
- * `GET /api/v1/products`). The catalogue is then split into
- * section-shaped subsets:
- *
- *   - Hero            → first product with a discount
- *   - Featured        → products flagged `featured`
- *   - Deals           → products with a non-zero discount
- *   - Electronics     → products in "Mobiles" / "Laptops" / "Tablets"
- *                       / "Audio" / "Televisions" / "Gaming"
- *   - Fashion         → products in "Men's Fashion" / "Women's
- *                       Fashion" / "Footwear"
- *
- * If the backend is unreachable, the page renders an inline message
- * and the non-product sections (header, footer, newsletter, etc.)
- * still load.
+ * Product details are already included in the catalogue response.
+ * No additional product enrichment API calls are required.
  */
 export default async function HomePage() {
+  /* -------------------------- Fetch products ---------------------------- */
+
+  console.time("HOME:listProducts");
+
   const result = await listProducts();
 
-  let allProducts: Product[] =
+  console.timeEnd("HOME:listProducts");
+
+  const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
 
-  if (allProducts.length > 0) {
-    allProducts = await enrichProductListWithDetails(allProducts);
-  }
+  console.log("HOME: product count:", allProducts.length);
+
+  /* -------------------------- Product filtering ------------------------ */
+
+  console.time("HOME:productFiltering");
 
   const hasProducts = allProducts.length > 0;
 
@@ -61,8 +56,6 @@ export default async function HomePage() {
     (product) => product.featured === true,
   );
 
-  // Keep backend-curated featured products first. When the backend has
-  // not flagged any products, use the catalogue order as a safe fallback.
   const featuredProducts = (
     explicitlyFeatured.length > 0
       ? explicitlyFeatured
@@ -131,6 +124,10 @@ export default async function HomePage() {
     )
     .slice(0, 8);
 
+  console.timeEnd("HOME:productFiltering");
+
+  /* ------------------------------- Render -------------------------------- */
+
   return (
     <>
       <Header />
@@ -144,24 +141,23 @@ export default async function HomePage() {
           overflowX: "hidden",
         }}
       >
-{/* Categories */}
-          <Box
-            sx={{
-              pt: { xs: 1, sm: 1.5 },
-              width: "100%",
-              maxWidth: "100%",
-            }}
-          >
+        {/* Categories */}
+        <Box
+          sx={{
+            pt: { xs: 1, sm: 1.5 },
+            width: "100%",
+            maxWidth: "100%",
+          }}
+        >
           <CategoryBar />
         </Box>
 
-        {/* Banner — only renders a real product when the backend
-            provided one; otherwise an empty banner. */}
+        {/* Hero Banner */}
         {heroProduct ? (
           <Hero product={heroProduct} />
         ) : null}
 
-        {/* Homepage sections */}
+        {/* Homepage Sections */}
         {hasProducts ? (
           <>
             <FeaturedProducts products={featuredProducts} />
@@ -177,6 +173,7 @@ export default async function HomePage() {
             >
               Products are temporarily unavailable
             </Typography>
+
             <Typography color="text.secondary">
               We could not reach the product catalogue. Please
               try again in a moment.
