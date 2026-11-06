@@ -145,10 +145,7 @@ export default function CartOrderSummary({
             sx={{
               fontWeight: 600,
               fontVariantNumeric: "tabular-nums",
-              color:
-                safeDeliveryCharge === 0
-                  ? "success.main"
-                  : "text.primary",
+              color: "text.primary",
             }}
           >
             ₹{formatMoney(safeDeliveryCharge)}
