@@ -30,6 +30,8 @@ export interface OrderResponseWire {
   id: number;
   orderNumber: string;
   status: OrderStatus;
+  paymentMethod?: "COD" | "ONLINE" | string | null;
+  paymentStatus?: string | null;
 
   paymentExpiresAt?: string | null;
 
