@@ -86,6 +86,7 @@ export default function CheckoutPage() {
   const [selectedAddressId, setSelectedAddressId] = useState<
       number | null
   >(null);
+  const [cartInitialised, setCartInitialised] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -110,7 +111,7 @@ export default function CheckoutPage() {
     }
 
     void fetchAddresses();
-    void fetchCart();
+    void fetchCart().finally(() => setCartInitialised(true));
   }, [checking, authed, fetchAddresses, fetchCart]);
 
   /**
@@ -554,7 +555,7 @@ export default function CheckoutPage() {
   }
 
   /** Cart must finish loading before an empty state is shown. */
-  if (cartLoading) {
+  if (cartLoading || !cartInitialised) {
     return (
       <>
         <Header />
