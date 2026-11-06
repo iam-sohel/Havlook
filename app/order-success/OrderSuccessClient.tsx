@@ -312,7 +312,7 @@ export default function OrderSuccessClient() {
               <ReceiptLongOutlinedIcon sx={{ fontSize: 36 }} />
             </Box>
             <Typography component="h1" variant="h4" sx={{ fontWeight: 800, mb: 1.5 }}>
-              We couldn???t verify your order
+              We couldn’t verify your order
             </Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
               {error || "The order could not be found. Please check your order link and try again."}
