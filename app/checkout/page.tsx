@@ -74,6 +74,7 @@ export default function CheckoutPage() {
 
   const items = useCartStore((s) => s.items);
   const serverGrandTotal = useCartStore((s) => s.serverGrandTotal);
+  const serverDeliveryCharge = useCartStore((s) => s.serverDeliveryCharge);
   const clearCart = useCartStore((s) => s.clearCart);
   const fetchCart = useCartStore((s) => s.fetchCart);
 
@@ -183,11 +184,11 @@ export default function CheckoutPage() {
    * Checkout preview only. The backend remains authoritative when creating
    * the order and calculating the final payment amount.
    *
-   * `serverGrandTotal` is the cart merchandise subtotal returned by the
-   * cart API. Delivery is previewed here using the configured business rule.
+   * Both values come from the cart API. The backend remains authoritative;
+   * never recreate delivery pricing rules in the browser.
    */
   const subtotal = Number(serverGrandTotal || 0);
-  const shippingCharge = subtotal < 249 ? 25 : 49;
+  const shippingCharge = Number(serverDeliveryCharge || 0);
   const total = subtotal + shippingCharge;
 
   /**
