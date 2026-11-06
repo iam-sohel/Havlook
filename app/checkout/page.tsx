@@ -33,7 +33,8 @@ import {
 } from "@/components/auth/validation";
 
 import { checkout as apiCheckout } from "@/services/orderService";
-import { createAddress as apiCreateAddress } from "@/services/addressService";
+// Address creation goes through the store so the saved-address list is
+// updated immediately and checkout retries can reuse the newly created ID.
 import {
   createPayment,
   verifyPayment,
@@ -81,6 +82,7 @@ export default function CheckoutPage() {
   const fetchCart = useCartStore((s) => s.fetchCart);
 
   const fetchAddresses = useAddressStore((s) => s.fetchAll);
+  const createAddress = useAddressStore((s) => s.create);
   const addresses = useAddressStore((s) => s.items);
 
   const [selectedAddressId, setSelectedAddressId] = useState<
@@ -429,7 +431,7 @@ export default function CheckoutPage() {
          * Customer entered a new/changed address.
          * Save it before creating the order.
          */
-        const createRes = await apiCreateAddress({
+        const createRes = await createAddress({
           fullName: fullName.trim(),
           phoneNumber: phone.trim(),
           streetAddress: addressLine.trim(),
