@@ -43,11 +43,14 @@ export interface CartResponseWire {
   /** Total discount applied. */
   totalDiscount: number;
 
-  /** Final payable cart total. */
+  /** Product subtotal after discounts, excluding delivery. */
   orderTotal: number;
 
-  /** Backend-calculated delivery charge. */
-  shippingCharge?: number;
+  /** Canonical backend field: delivery charge calculated from active rules. */
+  deliveryCharge?: number | string | null;
+
+  /** Legacy alias accepted for older backend deployments. */
+  shippingCharge?: number | string | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -127,7 +130,7 @@ function normaliseCart(raw: CartResponseWire): CartResponseWire {
 
     orderTotal: toNumber(raw.orderTotal),
 
-    shippingCharge: toNumber(raw.shippingCharge),
+    deliveryCharge: toNumber(raw.deliveryCharge ?? raw.shippingCharge),
   };
 }
 
