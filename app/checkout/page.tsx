@@ -193,8 +193,8 @@ export default function CheckoutPage() {
    * never recreate delivery pricing rules in the browser.
    */
   const subtotal = Number(serverGrandTotal || 0);
-  const shippingCharge = Number(serverDeliveryCharge || 0);
-  const total = subtotal + shippingCharge;
+  const deliveryCharge = Number(serverDeliveryCharge || 0);
+  const total = subtotal + deliveryCharge;
 
   /**
    * Synchronize the cart after a successful order/payment.
@@ -1072,11 +1072,11 @@ export default function CheckoutPage() {
                       mb: 2,
                     }}
                 >
-                  <Typography>Shipping</Typography>
+                  <Typography>Delivery Charge</Typography>
 
                   <Typography sx={{ fontWeight: 600 }}>
                     {"₹" +
-                        shippingCharge.toLocaleString("en-IN", {
+                        deliveryCharge.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
