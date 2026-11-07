@@ -209,7 +209,7 @@ function apply(
   ) => void,
 ) {
   console.log("Cart API data received by store:", response);
-  console.log("Delivery charge received by store:", response.shippingCharge);
+  console.log("Delivery charge received by store:", response.deliveryCharge);
   const items = response.items.map(mapWire);
 
 
@@ -222,7 +222,7 @@ function apply(
     serverTotalItems: totalItems,
     serverProductPrice: response.productPrice,
     serverTotalDiscount: response.totalDiscount,
-    serverDeliveryCharge: response.shippingCharge ?? 0,
+    serverDeliveryCharge: response.deliveryCharge ?? 0,
     loading: false,
     error: null,
   });

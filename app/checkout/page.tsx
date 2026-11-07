@@ -74,6 +74,7 @@ export default function CheckoutPage() {
 
   const items = useCartStore((s) => s.items);
   const serverGrandTotal = useCartStore((s) => s.serverGrandTotal);
+  const serverDeliveryCharge = useCartStore((s) => s.serverDeliveryCharge);
   const clearCart = useCartStore((s) => s.clearCart);
   const fetchCart = useCartStore((s) => s.fetchCart);
 
@@ -187,8 +188,8 @@ export default function CheckoutPage() {
    * cart API. Delivery is previewed here using the configured business rule.
    */
   const subtotal = Number(serverGrandTotal || 0);
-  const shippingCharge = subtotal < 249 ? 25 : 49;
-  const total = subtotal + shippingCharge;
+  const deliveryCharge = Number(serverDeliveryCharge || 0);
+  const total = subtotal + deliveryCharge;
 
   /**
    * Synchronize the cart after a successful order/payment.
@@ -1052,11 +1053,11 @@ export default function CheckoutPage() {
                       mb: 2,
                     }}
                 >
-                  <Typography>Shipping</Typography>
+                  <Typography>Delivery Charge</Typography>
 
                   <Typography sx={{ fontWeight: 600 }}>
                     {"₹" +
-                        shippingCharge.toLocaleString("en-IN", {
+                        deliveryCharge.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
