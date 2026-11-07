@@ -208,10 +208,7 @@ function apply(
       | ((state: CartStore) => Partial<CartStore>),
   ) => void,
 ) {
-  console.log("Cart API data received by store:", response);
-  console.log("Delivery charge received by store:", response.deliveryCharge);
   const items = response.items.map(mapWire);
-
 
   const grandTotal = response.orderTotal;
   const totalItems = response.totalItems;
