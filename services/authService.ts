@@ -52,6 +52,7 @@ export interface LoginCredentials {
 
 export type AuthLoginEndpoint =
   | "/api/v1/auth/login"
+  | "/api/v1/auth/customer/login"
   | "/api/v1/auth/admin/login";
 
 export interface SignupDetails {
@@ -190,10 +191,10 @@ function unwrap<T>(payload: unknown, fallback: T): T {
 
 export const authService = {
   /**
-   * POST /api/v1/auth/login
+   * POST /api/v1/auth/customer/login (customer default)
    *
-   * Login using either email OR phone. Defaults to the shared login
-   * endpoint; admin callers may explicitly pass the admin login endpoint.
+   * Login using either email OR phone. Callers for other roles must
+   * explicitly pass their role-specific login endpoint.
    *
    * Backend returns:
    *   accessToken
