@@ -155,7 +155,7 @@ const useAuthStore = create<AuthState>()(
              LOGIN
              ──────────────────────────────────────────────────────────────── */
 
-          async login(emailOrPhone, password, endpoint = "/api/v1/auth/login") {
+          async login(emailOrPhone, password, endpoint = "/api/v1/auth/customer/login") {
             set({
               loading: true,
               isAuthenticating: true,

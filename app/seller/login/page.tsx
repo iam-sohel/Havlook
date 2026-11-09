@@ -109,7 +109,7 @@ export default function SellerLoginPage() {
       : identifier.trim();
 
     setSubmitting(true);
-    const result = await login(loginIdentifier, password);
+    const result = await login(loginIdentifier, password, "/api/v1/auth/login");
     if (!result.ok) {
       setSubmitting(false);
       return;
