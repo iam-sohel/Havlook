@@ -34,6 +34,8 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import ShoppingBagIcon from "@mui/icons-material/ShoppingBag";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 
+import BottomNav from "./BottomNav";
+
 import useCartStore from "@/store/cartStore";
 import useWishlistStore from "@/store/wishlistStore";
 import useAuthStore from "@/store/authStore";
@@ -254,7 +256,7 @@ export default function Navbar() {
           component={Link}
           href={
             isAuthenticated
-              ? "/account/addresses"
+              ? "/account"
               : "/login"
           }
           variant="contained"
@@ -534,7 +536,7 @@ export default function Navbar() {
               component={Link}
               href={
                 isAuthenticated
-                  ? "/account/addresses"
+                  ? "/account"
                   : "/login"
               }
               onClick={closeMobileMenu}
@@ -740,6 +742,12 @@ export default function Navbar() {
           )}
         </List>
       </Drawer>
+
+      {/* ============================================================
+          MOBILE BOTTOM NAVIGATION
+          Shown on mobile only; hidden on desktop (md+).
+          ============================================================ */}
+      <BottomNav />
     </AppBar>
   );
 }

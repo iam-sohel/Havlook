@@ -15,7 +15,7 @@ import { listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
- * HAVLOOK — Home page (Server Component).
+ * HAVLOOK - Home page (Server Component).
  *
  * Backend is the single source of truth for product data.
  * Product details are already included in the catalogue response.
@@ -24,20 +24,10 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
-  console.time("HOME:listProducts");
-
   const result = await listProducts();
-
-  console.timeEnd("HOME:listProducts");
 
   const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
-
-  console.log("HOME: product count:", allProducts.length);
-
-  /* -------------------------- Product filtering ------------------------ */
-
-  console.time("HOME:productFiltering");
 
   const hasProducts = allProducts.length > 0;
 
@@ -124,8 +114,6 @@ export default async function HomePage() {
     )
     .slice(0, 8);
 
-  console.timeEnd("HOME:productFiltering");
-
   /* ------------------------------- Render -------------------------------- */
 
   return (
@@ -152,7 +140,8 @@ export default async function HomePage() {
           <CategoryBar />
         </Box>
 
-        {/* Hero Banner */}
+ * Product details are already included in the catalogue response.
+ * No additional product enrichment API calls are required.
         {heroProduct ? (
           <Hero product={heroProduct} />
         ) : null}

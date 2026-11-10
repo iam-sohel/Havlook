@@ -77,7 +77,7 @@ export default function CheckoutPage() {
   const cartLoading = useCartStore((s) => s.loading);
   const cartError = useCartStore((s) => s.error);
   const serverGrandTotal = useCartStore((s) => s.serverGrandTotal);
-  const serverDeliveryCharge = useCartStore((s) => s.serverDeliveryCharge);
+const serverDeliveryCharge = useCartStore((s) => s.serverDeliveryCharge);
   const clearCart = useCartStore((s) => s.clearCart);
   const fetchCart = useCartStore((s) => s.fetchCart);
 
@@ -188,9 +188,6 @@ export default function CheckoutPage() {
   /**
    * Checkout preview only. The backend remains authoritative when creating
    * the order and calculating the final payment amount.
-   *
-   * Both values come from the cart API. The backend remains authoritative;
-   * never recreate delivery pricing rules in the browser.
    */
   const subtotal = Number(serverGrandTotal || 0);
   const deliveryCharge = Number(serverDeliveryCharge || 0);
@@ -531,6 +528,7 @@ export default function CheckoutPage() {
     authed,
     effectiveSelectedAddressId,
     addresses,
+    createAddress,
     paymentMethod,
     finishSuccessfulOrder,
     startOnlinePayment,

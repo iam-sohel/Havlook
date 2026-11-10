@@ -166,15 +166,30 @@ const useAuthStore = create<AuthState>()(
                 emailOrPhone.trim(),
             );
 
-            const result = await authService.login(
-              {
-                ...(isPhone
+            let result: Awaited<ReturnType<typeof authService.login>>;
+
+            try {
+              result = await authService.login(
+                {
+                  ...(isPhone
                     ? { phone: emailOrPhone.trim() }
                     : { email: emailOrPhone.trim() }),
-                password,
-              },
-              endpoint,
-            );
+                  password,
+                },
+                endpoint,
+              );
+            } catch {
+              const message =
+                "Login failed due to a network or server error. Please try again.";
+
+              set({
+                loading: false,
+                isAuthenticating: false,
+                error: message,
+              });
+
+              return { ok: false, message };
+            }
 
             if (!result.ok) {
               set({

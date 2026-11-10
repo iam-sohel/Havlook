@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   Alert,
@@ -71,18 +71,11 @@ interface InitialLoginState {
 }
 
 /*
- * Read signup redirect parameters once during initial render.
- *
- * Email:
- * /login?registered=1&method=email&identifier=test@gmail.com
- *
- * Phone:
- * /login?registered=1&method=phone&identifier=9876543210
- *
- * Reading them in lazy state initializers keeps the query parameters from
- * requiring synchronous setState inside an effect.
+ * Build initial login state from Next.js search parameters.
  */
-function readInitialLoginState(): InitialLoginState {
+function readInitialLoginState(
+  params: { get(name: string): string | null },
+): InitialLoginState {
   const initial: InitialLoginState = {
     method: "email",
     email: "",
@@ -90,24 +83,15 @@ function readInitialLoginState(): InitialLoginState {
     notice: null,
   };
 
-  if (typeof window === "undefined") {
-    return initial;
-  }
-
-  const params = new URLSearchParams(window.location.search);
   const method = params.get("method");
   const identifier = params.get("identifier");
 
   if (method === "phone") {
     initial.method = "phone";
-    if (identifier) {
-      initial.phone = identifier;
-    }
+    if (identifier) initial.phone = identifier;
   } else {
     initial.method = "email";
-    if (identifier && method === "email") {
-      initial.email = identifier;
-    }
+    if (identifier && method === "email") initial.email = identifier;
   }
 
   if (params.get("registered") === "1") {
@@ -130,7 +114,7 @@ function readInitialLoginState(): InitialLoginState {
   return initial;
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
 
   const {
@@ -140,8 +124,10 @@ export default function LoginPage() {
     clearError,
   } = useAuthStore();
 
-  const [initialLoginState] = useState<InitialLoginState>(
-    readInitialLoginState,
+  const searchParams = useSearchParams();
+
+  const [initialLoginState] = useState(() =>
+    readInitialLoginState(searchParams),
   );
 
   const [loginMethod, setLoginMethod] =
@@ -176,6 +162,7 @@ export default function LoginPage() {
   useEffect(() => {
     clearError();
   }, [clearError]);
+
 
   const handleMethodChange = (
       event: React.ChangeEvent<HTMLInputElement>,
@@ -516,5 +503,13 @@ export default function LoginPage() {
           </Typography>
         </Stack>
       </AuthCard>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

@@ -192,24 +192,27 @@ export default function ProductCard({
           }}
         >
           {/* Product photo stage */}
-<Box
-              sx={{
-                height: { xs: 150, sm: 200, md: 220 },
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                bgcolor: "grey.100",
-                overflow: "hidden",
-              }}
-            >
+          <Box
+            sx={{
+              height: { xs: 180, sm: 220, md: 240 },
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              bgcolor: "grey.100",
+              overflow: "hidden",
+            }}
+          >
             <Box
               className="product-card-image"
               sx={{
                 position: "relative",
-                width: { xs: "78%", sm: 170 },
-                maxWidth: 170,
-                height: { xs: 140, sm: 170 },
-                maxHeight: 170,
+                width: { xs: "85%", sm: 190, md: 200 },
+                maxWidth: { xs: "100%", sm: 190, md: 200 },
+                height: { xs: 160, sm: 180, md: 190 },
+                maxHeight: { xs: 160, sm: 180, md: 190 },
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 transition: "transform .35s ease",
                 "@media (prefers-reduced-motion: reduce)": {
                   transition: "none",
@@ -223,6 +226,8 @@ export default function ProductCard({
                 sizes="(max-width: 600px) 100vw, (max-width: 1200px) 33vw, 25vw"
                 style={{
                   objectFit: "contain",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
                 }}
                 onError={handleImageError}
               />
@@ -300,8 +305,8 @@ export default function ProductCard({
             border: "1px solid",
             borderColor: "divider",
             boxShadow: 1,
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             "&.Mui-disabled": {
               opacity: 0.65,
             },
@@ -338,6 +343,7 @@ export default function ProductCard({
               flex: 1,
               display: "flex",
               flexDirection: "column",
+              gap: 1,
             }}
           >
         {/* Brand */}
@@ -469,9 +475,10 @@ export default function ProductCard({
           disableElevation
           sx={{
             mt: "auto",
-            py: { xs: 0.75, sm: 1 },
-            minHeight: 44,
+            py: { xs: 1, sm: 1 },
+            minHeight: 48,
             fontWeight: 700,
+            borderRadius: 2,
           }}
           onClick={handleAddToCart}
         >
