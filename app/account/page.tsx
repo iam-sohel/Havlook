@@ -107,33 +107,38 @@ export default function AccountPage() {
 
   const loadProfile = useCallback(async (signal?: AbortSignal) => {
     setLoadingProfile(true);
-    const response = await getMyProfile(signal);
+    try {
+      const response = await getMyProfile(signal);
+      if (signal?.aborted) return;
 
-    if (signal?.aborted) return;
-
-    if (response.ok && response.data) {
-      const nextProfile = {
-        firstName: response.data.firstName ?? "",
-        lastName: response.data.lastName ?? "",
-        email: response.data.email ?? "",
-        phone: response.data.phone ?? "",
-      };
-      setProfile(nextProfile);
-      setPageError(null);
-      useAuthStore.setState({
-        user: {
-          id: response.data.id,
-          firstName: nextProfile.firstName,
-          lastName: nextProfile.lastName,
-          email: nextProfile.email,
-          phone: nextProfile.phone,
-        },
-      });
-    } else {
-      setPageError("We couldn't load your profile. Please try again.");
+      if (response.ok && response.data) {
+        const nextProfile = {
+          firstName: response.data.firstName ?? "",
+          lastName: response.data.lastName ?? "",
+          email: response.data.email ?? "",
+          phone: response.data.phone ?? "",
+        };
+        setProfile(nextProfile);
+        setPageError(null);
+        useAuthStore.setState({
+          user: {
+            id: response.data.id,
+            firstName: nextProfile.firstName,
+            lastName: nextProfile.lastName,
+            email: nextProfile.email,
+            phone: nextProfile.phone,
+          },
+        });
+      } else {
+        setPageError("We couldn't load your profile. Please try again.");
+      }
+    } catch {
+      if (!signal?.aborted) {
+        setPageError("We couldn't load your profile. Check your connection and retry.");
+      }
+    } finally {
+      if (!signal?.aborted) setLoadingProfile(false);
     }
-
-    setLoadingProfile(false);
   }, []);
 
   useEffect(() => {
@@ -144,6 +149,8 @@ export default function AccountPage() {
   }, [token, loadProfile]);
 
   const handleProfileSubmit = async () => {
+    if (savingProfile) return;
+
     const firstName = profile.firstName.trim();
     const lastName = profile.lastName.trim();
     const phone = profile.phone.trim();
@@ -161,33 +168,40 @@ export default function AccountPage() {
     setPageError(null);
     setProfileMessage(null);
 
-    const response = await updateMyProfile({ firstName, lastName, phone });
-    if (response.ok && response.data) {
-      const nextProfile = {
-        firstName: response.data.firstName ?? firstName,
-        lastName: response.data.lastName ?? lastName,
-        email: response.data.email ?? profile.email,
-        phone: response.data.phone ?? phone,
-      };
-      setProfile(nextProfile);
-      useAuthStore.setState({
-        user: {
-          id: response.data.id,
-          firstName: nextProfile.firstName,
-          lastName: nextProfile.lastName,
-          email: nextProfile.email,
-          phone: nextProfile.phone,
-        },
-      });
-      setProfileMessage("Your profile has been updated.");
-      setMode("overview");
-    } else {
-      setPageError("Profile update failed. Please check your details and retry.");
+    try {
+      const response = await updateMyProfile({ firstName, lastName, phone });
+      if (response.ok && response.data) {
+        const nextProfile = {
+          firstName: response.data.firstName ?? firstName,
+          lastName: response.data.lastName ?? lastName,
+          email: response.data.email ?? profile.email,
+          phone: response.data.phone ?? phone,
+        };
+        setProfile(nextProfile);
+        useAuthStore.setState({
+          user: {
+            id: response.data.id,
+            firstName: nextProfile.firstName,
+            lastName: nextProfile.lastName,
+            email: nextProfile.email,
+            phone: nextProfile.phone,
+          },
+        });
+        setProfileMessage("Your profile has been updated.");
+        setMode("overview");
+      } else {
+        setPageError("Profile update failed. Please check your details and retry.");
+      }
+    } catch {
+      setPageError("Profile update failed because of a network or server error. Please retry.");
+    } finally {
+      setSavingProfile(false);
     }
-    setSavingProfile(false);
   };
 
   const handlePasswordSubmit = async () => {
+    if (changingPassword) return;
+
     const { currentPassword, newPassword, confirmPassword } = passwordFields;
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPageError("Complete all password fields before continuing.");
@@ -205,34 +219,45 @@ export default function AccountPage() {
     setChangingPassword(true);
     setPageError(null);
     setPasswordMessage(null);
-    const response = await changeMyPassword({
-      currentPassword,
-      newPassword,
-      confirmPassword,
-    });
+    try {
+      const response = await changeMyPassword({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
 
-    if (response.ok) {
-      setPasswordFields({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setPasswordMessage("Password changed successfully.");
-      setMode("overview");
-    } else {
-      setPageError("Password change failed. Verify your current password and try again.");
+      if (response.ok) {
+        setPasswordFields({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setPasswordMessage("Password changed successfully.");
+        setMode("overview");
+      } else {
+        setPageError("Password change failed. Verify your current password and try again.");
+      }
+    } catch {
+      setPageError("Password change failed because of a network or server error. Please retry.");
+    } finally {
+      setChangingPassword(false);
     }
-    setChangingPassword(false);
   };
 
   const handleDeactivate = async () => {
+    if (deactivating) return;
+
     setDeactivating(true);
     setPageError(null);
-    const response = await deactivateMyAccount();
-    if (response.ok) {
-      logout();
-      router.replace("/login");
-      return;
+    try {
+      const response = await deactivateMyAccount();
+      if (response.ok) {
+        logout();
+        router.replace("/login");
+        return;
+      }
+      setPageError("We couldn't deactivate your account. Please try again.");
+    } catch {
+      setPageError("Account deactivation failed because of a network or server error. Please retry.");
+    } finally {
+      setDeactivating(false);
     }
-    setPageError("We couldn't deactivate your account. Please try again.");
-    setDeactivating(false);
-    setShowDeactivateConfirm(false);
   };
 
   const handleLogout = () => {
@@ -551,16 +576,29 @@ export default function AccountPage() {
                         </Button>
                       </Stack>
                       {showDeactivateConfirm && (
-                        <Alert
-                          severity="warning"
-                          sx={{ mt: 2 }}
-                          action={
-                            <Button color="error" size="small" disabled={deactivating} onClick={() => void handleDeactivate()}>
-                              {deactivating ? "Deactivating…" : "Confirm"}
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                          <Typography variant="body2">
+                            Are you sure? This action will deactivate your account.
+                          </Typography>
+                          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                            <Button
+                              color="inherit"
+                              size="small"
+                              disabled={deactivating}
+                              onClick={() => setShowDeactivateConfirm(false)}
+                            >
+                              Cancel
                             </Button>
-                          }
-                        >
-                          Are you sure? This action will deactivate your account.
+                            <Button
+                              color="error"
+                              size="small"
+                              variant="contained"
+                              disabled={deactivating}
+                              onClick={() => void handleDeactivate()}
+                            >
+                              {deactivating ? "Deactivating…" : "Yes, deactivate"}
+                            </Button>
+                          </Stack>
                         </Alert>
                       )}
                     </CardContent>
