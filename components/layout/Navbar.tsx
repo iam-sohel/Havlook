@@ -254,7 +254,7 @@ export default function Navbar() {
           component={Link}
           href={
             isAuthenticated
-              ? "/account/addresses"
+              ? "/account"
               : "/login"
           }
           variant="contained"
@@ -534,7 +534,7 @@ export default function Navbar() {
               component={Link}
               href={
                 isAuthenticated
-                  ? "/account/addresses"
+                  ? "/account"
                   : "/login"
               }
               onClick={closeMobileMenu}
@@ -673,7 +673,7 @@ export default function Navbar() {
               <ListItem disablePadding>
                 <ListItemButton
                   component={Link}
-                  href="/account/addresses"
+                  href="/account"
                   onClick={closeMobileMenu}
                   sx={{
                     borderRadius: 2,
