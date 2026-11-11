@@ -112,7 +112,14 @@ export default function AdminKycPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void loadKyc(controller.signal);
+
+    // Defer the request to a microtask so the effect itself does not
+    // synchronously invoke a state-updating loader.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadKyc(controller.signal);
+      }
+    });
 
     return () => {
       controller.abort();
