@@ -102,12 +102,32 @@ export default function AuthClientBootstrap(): null {
     // `hooks/useRequireAuth`) and the navbar make their decision.
     void useAuthStore.persist.rehydrate();
 
-    // Live token reader — always reflects the latest store value, including
-    // updates after a fresh login. We don't subscribe to the store because
-    // `apiRequest` reads this on every call.
-    const unregisterToken = registerAuthTokenGetter(() =>
-      useAuthStore.getState().token,
-    );
+    // Live token reader — always reflects the latest store value.
+    // Because persistence uses skipHydration, the first admin API requests can
+    // run before Zustand finishes rehydrating. During that short startup window
+    // getState().token is null even though a valid session exists in localStorage.
+    // Fall back to the persisted token so protected requests never go out
+    // unauthenticated during bootstrap. Never log or expose the token.
+    const unregisterToken = registerAuthTokenGetter(() => {
+      const stateToken = useAuthStore.getState().token;
+      if (stateToken) return stateToken;
+
+      try {
+        const persisted = window.localStorage.getItem("HAVLOOK-auth");
+        if (!persisted) return null;
+
+        const parsed: unknown = JSON.parse(persisted);
+        if (!parsed || typeof parsed !== "object") return null;
+
+        const persistedState = (parsed as { state?: unknown }).state;
+        if (!persistedState || typeof persistedState !== "object") return null;
+
+        const token = (persistedState as { token?: unknown }).token;
+        return typeof token === "string" && token.length > 0 ? token : null;
+      } catch {
+        return null;
+      }
+    });
 
     // Provide the single-flight refresher that `lib/api.ts` uses to silently
     // renew an expired access token and retry the request. The failure handler
