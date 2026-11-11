@@ -83,9 +83,6 @@ export default function AdminKycPage() {
 
   const loadKyc = useCallback(async (signal?: AbortSignal) => {
     try {
-      setLoading(true);
-      setError(null);
-
       const result = await listAdminKyc({
         pendingOnly,
         page,
@@ -140,6 +137,8 @@ export default function AdminKycPage() {
                   : "outlined"
               }
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 setPendingOnly(true);
                 setPage(0);
               }}
@@ -156,6 +155,8 @@ export default function AdminKycPage() {
                   : "outlined"
               }
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 setPendingOnly(false);
                 setPage(0);
               }}
@@ -169,6 +170,8 @@ export default function AdminKycPage() {
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 void loadKyc();
               }}
               disabled={loading}
@@ -190,6 +193,8 @@ export default function AdminKycPage() {
               color="inherit"
               size="small"
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 void loadKyc();
               }}
             >
@@ -380,6 +385,8 @@ export default function AdminKycPage() {
                 loading || page <= 0
               }
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 setPage((current) =>
                   Math.max(0, current - 1),
                 );
@@ -408,6 +415,8 @@ export default function AdminKycPage() {
                 page + 1 >= totalPages
               }
               onClick={() => {
+                setLoading(true);
+                setError(null);
                 setPage((current) =>
                   current + 1,
                 );
