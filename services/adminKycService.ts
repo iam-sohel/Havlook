@@ -258,11 +258,13 @@ export async function listAdminKyc(
 
 export async function getAdminKyc(
   sellerId: number | string,
+  signal?: AbortSignal,
 ): Promise<AdminSellerKyc> {
   const response = await apiRequest(
     `/api/v1/admin/sellers/${sellerId}/kyc`,
     {
       method: "GET",
+      signal,
     },
   );
 
