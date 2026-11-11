@@ -78,15 +78,18 @@ export interface AdminOrderPage {
 }
 
 function unwrap<T>(response: unknown): T {
-  if (
-    response &&
-    typeof response === "object" &&
-    "data" in response
-  ) {
-    return response.data as T;
+  const transport = asRecord(response);
+  const payload =
+    transport.ok === true && "data" in transport
+      ? transport.data
+      : response;
+  const envelope = asRecord(payload);
+
+  if (envelope.success === true && "data" in envelope) {
+    return envelope.data as T;
   }
 
-  return response as T;
+  return payload as T;
 }
 
 /**
@@ -195,20 +198,15 @@ function normalizePage(
     ? record.content.map(normalizeOrder)
     : [];
 
+  const nestedPage = asRecord(record.page);
   return {
     content,
-    page: toNumber(record.page),
-    size:
-      toNumber(record.size) ||
-      content.length,
-    totalElements: toNumber(
-      record.totalElements
-    ),
-    totalPages: toNumber(
-      record.totalPages
-    ),
-    first: asOptionalBoolean(record.first),
-    last: asOptionalBoolean(record.last),
+    page: toNumber(record.number ?? nestedPage.number ?? record.pageNumber),
+    size: toNumber(record.size ?? nestedPage.size) || content.length,
+    totalElements: toNumber(record.totalElements ?? nestedPage.totalElements),
+    totalPages: toNumber(record.totalPages ?? nestedPage.totalPages),
+    first: asOptionalBoolean(record.first) ?? asOptionalBoolean(nestedPage.first),
+    last: asOptionalBoolean(record.last) ?? asOptionalBoolean(nestedPage.last),
   };
 }
 
