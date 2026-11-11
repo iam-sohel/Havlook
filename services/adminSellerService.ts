@@ -58,6 +58,30 @@ function unwrap<T>(payload: unknown, fallback: T): T {
   return fallback;
 }
 
+
+function backendFailure(
+  response: { status: number; data: unknown },
+): { ok: false; status: number; message: string } | null {
+  const payload = response.data;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const envelope = payload as { success?: unknown; message?: unknown };
+
+  if (envelope.success !== false) return null;
+
+  return {
+    ok: false,
+    status: response.status,
+    message:
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the request.",
+  };
+}
+
 function toCount(value: unknown): number | null {
   const amount =
     typeof value === "number" ? value : Number(value as number | string);
@@ -164,6 +188,9 @@ export async function listAdminSellers(
 
   if (!res.ok) return res;
 
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
+
   const page = normalisePage(
     unwrap<AdminSellerPage | null>(res.data, null),
   );
@@ -199,6 +226,9 @@ export async function getAdminSeller(
 
   if (!res.ok) return res;
 
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
+
   const seller = normaliseSeller(
     unwrap<AdminSeller | null>(res.data, null) as AdminSeller,
   );
@@ -233,6 +263,9 @@ export async function activateAdminSeller(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
   return { ok: true, status: res.status, data: true };
 }
 
@@ -255,6 +288,9 @@ export async function deactivateAdminSeller(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
   return { ok: true, status: res.status, data: true };
 }
 
