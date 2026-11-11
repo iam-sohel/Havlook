@@ -284,6 +284,7 @@ export async function approveAdminKyc(
   );
 
   throwIfFailed(response, "Unable to approve seller KYC.");
+  unwrap<unknown>(response);
 }
 
 export async function rejectAdminKyc(
@@ -309,4 +310,5 @@ export async function rejectAdminKyc(
   );
 
   throwIfFailed(response, "Unable to reject seller KYC.");
+  unwrap<unknown>(response);
 }
