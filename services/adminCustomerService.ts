@@ -165,10 +165,26 @@ function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage
   }
 
   const content = record.content.map(normalizeCustomer);
-  // Spring Page uses "number". Some API response DTOs expose "page" or
-  // "pageNumber"; when metadata is omitted, retain the validated request
-  // page rather than rejecting an otherwise valid content response.
-  const pageValue = record.number ?? record.page ?? record.pageNumber;
+  // Spring Page exposes "number" at the top level. Some admin DTOs wrap
+  // pagination in a "page" object, so inspect both shapes before falling
+  // back to the already-validated request page.
+  const nestedPage =
+    record.page !== null &&
+    typeof record.page === "object" &&
+    !Array.isArray(record.page)
+      ? (record.page as UnknownRecord)
+      : null;
+
+  const pageValue =
+    record.number ??
+    record.pageNumber ??
+    (typeof record.page === "number" || typeof record.page === "string"
+      ? record.page
+      : undefined) ??
+    nestedPage?.number ??
+    nestedPage?.pageNumber ??
+    nestedPage?.page;
+
   const page =
     pageValue === undefined || pageValue === null
       ? requestedPage
