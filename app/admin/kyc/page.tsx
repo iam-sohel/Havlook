@@ -81,7 +81,7 @@ export default function AdminKycPage() {
   const [totalPages, setTotalPages] =
     useState(0);
 
-  const loadKyc = useCallback(async () => {
+  const loadKyc = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -90,11 +90,16 @@ export default function AdminKycPage() {
         pendingOnly,
         page,
         size,
+        signal,
       });
+
+      if (signal?.aborted) return;
 
       setItems(result.content);
       setTotalPages(result.totalPages);
     } catch (err) {
+      if (signal?.aborted) return;
+
       const message =
         err instanceof Error
           ? err.message
@@ -102,22 +107,18 @@ export default function AdminKycPage() {
 
       setError(message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [page, pendingOnly, size]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      if (cancelled) return;
-      await loadKyc();
-    };
-
-    void run();
+    const controller = new AbortController();
+    void loadKyc(controller.signal);
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [loadKyc]);
 
