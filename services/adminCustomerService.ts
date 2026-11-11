@@ -258,12 +258,13 @@ function throwIfFailed(
 export async function listAdminCustomers(
   page = 0,
   size = 20,
+  signal?: AbortSignal,
 ): Promise<AdminCustomerPage> {
   validatePagination(page, size);
 
   const response = await apiRequest(
     `/api/v1/admin/customers?page=${page}&size=${size}&sort=id,desc`,
-    { method: "GET" },
+    { method: "GET", signal },
   );
 
   throwIfFailed(response, "Unable to load customers.");
