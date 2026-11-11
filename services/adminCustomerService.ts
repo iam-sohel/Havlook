@@ -155,7 +155,7 @@ function normalizeCustomer(value: unknown): AdminCustomer {
   };
 }
 
-function normalizePage(value: unknown): AdminCustomerPage {
+function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage {
   const record = asRecord(value, "customer page");
 
   if (!Array.isArray(record.content)) {
@@ -165,9 +165,14 @@ function normalizePage(value: unknown): AdminCustomerPage {
   }
 
   const content = record.content.map(normalizeCustomer);
-  const pageValue = record.number ?? record.page;
-
-  const page = asNonNegativeInteger(pageValue, "page number");
+  // Spring Page uses "number". Some API response DTOs expose "page" or
+  // "pageNumber"; when metadata is omitted, retain the validated request
+  // page rather than rejecting an otherwise valid content response.
+  const pageValue = record.number ?? record.page ?? record.pageNumber;
+  const page =
+    pageValue === undefined || pageValue === null
+      ? requestedPage
+      : asNonNegativeInteger(pageValue, "page number");
   const size = asNonNegativeInteger(record.size, "page size");
   const totalElements = asNonNegativeInteger(
     record.totalElements,
@@ -236,7 +241,7 @@ export async function listAdminCustomers(
 
   throwIfFailed(response, "Unable to load customers.");
 
-  return normalizePage(unwrapBackendData<unknown>(response));
+  return normalizePage(unwrapBackendData<unknown>(response), page);
 }
 
 export async function getAdminCustomer(
