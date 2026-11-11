@@ -155,7 +155,7 @@ function normalizeCustomer(value: unknown): AdminCustomer {
   };
 }
 
-function normalizePage(value: unknown): AdminCustomerPage {
+function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage {
   const record = asRecord(value, "customer page");
 
   if (!Array.isArray(record.content)) {
@@ -165,15 +165,47 @@ function normalizePage(value: unknown): AdminCustomerPage {
   }
 
   const content = record.content.map(normalizeCustomer);
-  const pageValue = record.number ?? record.page;
+  // Spring Page exposes "number" at the top level. Some admin DTOs wrap
+  // pagination in a "page" object, so inspect both shapes before falling
+  // back to the already-validated request page.
+  const nestedPage =
+    record.page !== null &&
+    typeof record.page === "object" &&
+    !Array.isArray(record.page)
+      ? (record.page as UnknownRecord)
+      : null;
+  const pageable =
+    record.pageable !== null &&
+    typeof record.pageable === "object" &&
+    !Array.isArray(record.pageable)
+      ? (record.pageable as UnknownRecord)
+      : null;
 
-  const page = asNonNegativeInteger(pageValue, "page number");
-  const size = asNonNegativeInteger(record.size, "page size");
+  const pageValue =
+    record.number ??
+    record.pageNumber ??
+    (typeof record.page === "number" || typeof record.page === "string"
+      ? record.page
+      : undefined) ??
+    nestedPage?.number ??
+    nestedPage?.pageNumber ??
+    nestedPage?.page ??
+    pageable?.pageNumber ??
+    pageable?.page;
+
+  const page =
+    pageValue === undefined || pageValue === null
+      ? requestedPage
+      : asNonNegativeInteger(pageValue, "page number");
+  const size = asNonNegativeInteger(record.size ?? nestedPage?.size, "page size");
   const totalElements = asNonNegativeInteger(
-    record.totalElements,
+    record.totalElements ?? nestedPage?.totalElements,
     "totalElements",
   );
-  const totalPages = asNonNegativeInteger(record.totalPages, "totalPages");
+  const totalPages = asNonNegativeInteger(
+    record.totalPages ?? nestedPage?.totalPages,
+    "totalPages",
+  );
 
   if (size === 0 && totalElements > 0) {
     throw new Error(
@@ -187,8 +219,8 @@ function normalizePage(value: unknown): AdminCustomerPage {
     size,
     totalElements,
     totalPages,
-    first: asOptionalBoolean(record, "first"),
-    last: asOptionalBoolean(record, "last"),
+    first: asOptionalBoolean(record, "first") ?? asOptionalBoolean(nestedPage ?? {}, "first"),
+    last: asOptionalBoolean(record, "last") ?? asOptionalBoolean(nestedPage ?? {}, "last"),
   };
 }
 
@@ -226,17 +258,18 @@ function throwIfFailed(
 export async function listAdminCustomers(
   page = 0,
   size = 20,
+  signal?: AbortSignal,
 ): Promise<AdminCustomerPage> {
   validatePagination(page, size);
 
   const response = await apiRequest(
     `/api/v1/admin/customers?page=${page}&size=${size}&sort=id,desc`,
-    { method: "GET" },
+    { method: "GET", signal },
   );
 
   throwIfFailed(response, "Unable to load customers.");
 
-  return normalizePage(unwrapBackendData<unknown>(response));
+  return normalizePage(unwrapBackendData<unknown>(response), page);
 }
 
 export async function getAdminCustomer(

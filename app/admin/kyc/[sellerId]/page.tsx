@@ -167,40 +167,44 @@ export default function AdminSellerKycPage() {
   const [success, setSuccess] =
     useState<string | null>(null);
 
-  const loadKyc = useCallback(async () => {
+  const loadKyc = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
 
-      const data =
-        await getAdminKyc(sellerId);
+      const data = await getAdminKyc(sellerId, signal);
+      if (signal?.aborted) return;
 
       setKyc(data);
     } catch (err) {
+      if (signal?.aborted) return;
+
       setError(
         err instanceof Error
           ? err.message
           : "Unable to load seller KYC.",
       );
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [sellerId]);
 
   useEffect(() => {
     if (!sellerId) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
 
-    const run = async () => {
-      if (cancelled) return;
-      await loadKyc();
-    };
-
-    void run();
+    // Defer the state-updating loader outside the synchronous effect body.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadKyc(controller.signal);
+      }
+    });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [sellerId, loadKyc]);
 

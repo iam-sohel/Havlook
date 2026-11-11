@@ -58,6 +58,30 @@ function unwrap<T>(payload: unknown, fallback: T): T {
   return fallback;
 }
 
+
+function backendFailure(
+  response: { status: number; data: unknown },
+): { ok: false; status: number; message: string } | null {
+  const payload = response.data;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const envelope = payload as { success?: unknown; message?: unknown };
+
+  if (envelope.success !== false) return null;
+
+  return {
+    ok: false,
+    status: response.status,
+    message:
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the request.",
+  };
+}
+
 function toCount(value: unknown): number | null {
   const amount =
     typeof value === "number" ? value : Number(value as number | string);
@@ -104,18 +128,23 @@ function normalisePage(page: AdminSellerPage | null): AdminSellerPage | null {
     return null;
   }
 
+  const rawPage = page as unknown as Record<string, unknown>;
+  const nestedPage =
+    rawPage.page && typeof rawPage.page === "object" && !Array.isArray(rawPage.page)
+      ? (rawPage.page as Record<string, unknown>)
+      : {};
   const content = page.content
     .map(normaliseSeller)
     .filter((seller): seller is AdminSeller => seller !== null);
 
   return {
     content,
-    number: toCount(page.number) ?? 0,
-    size: toCount(page.size) ?? content.length,
-    totalElements: toCount(page.totalElements) ?? content.length,
-    totalPages: toCount(page.totalPages) ?? (content.length > 0 ? 1 : 0),
-    first: page.first !== false,
-    last: page.last !== false,
+    number: toCount(rawPage.number ?? nestedPage.number) ?? 0,
+    size: toCount(rawPage.size ?? nestedPage.size) ?? content.length,
+    totalElements: toCount(rawPage.totalElements ?? nestedPage.totalElements) ?? content.length,
+    totalPages: toCount(rawPage.totalPages ?? nestedPage.totalPages) ?? (content.length > 0 ? 1 : 0),
+    first: rawPage.first !== false && nestedPage.first !== false,
+    last: rawPage.last !== false && nestedPage.last !== false,
   };
 }
 
@@ -159,6 +188,9 @@ export async function listAdminSellers(
 
   if (!res.ok) return res;
 
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
+
   const page = normalisePage(
     unwrap<AdminSellerPage | null>(res.data, null),
   );
@@ -194,6 +226,9 @@ export async function getAdminSeller(
 
   if (!res.ok) return res;
 
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
+
   const seller = normaliseSeller(
     unwrap<AdminSeller | null>(res.data, null) as AdminSeller,
   );
@@ -228,6 +263,9 @@ export async function activateAdminSeller(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
   return { ok: true, status: res.status, data: true };
 }
 
@@ -250,6 +288,9 @@ export async function deactivateAdminSeller(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
   return { ok: true, status: res.status, data: true };
 }
 

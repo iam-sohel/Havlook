@@ -74,7 +74,7 @@ const ACCENT_STYLES = {
 
 function formatMetric(value: number | null): string {
   if (value === null || !Number.isFinite(value)) {
-    return "Ã¢â‚¬â€";
+    return "—";
   }
 
   return value.toLocaleString("en-IN");
@@ -209,7 +209,7 @@ function MetricCard({
 }
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return "Ã¢â‚¬â€";
+  if (!value) return "—";
 
   const date = new Date(value);
 
@@ -230,7 +230,7 @@ function formatAmount(
   const currencyCode = currency || "INR";
 
   if (typeof amount !== "number" || !Number.isFinite(amount)) {
-    return "Ã¢â‚¬â€";
+    return "—";
   }
 
   try {
@@ -291,15 +291,30 @@ export default function AdminDashboardPage() {
 
 
     try {
-      const [dashboardSummary, orders] = await Promise.all([
+      const [summaryResult, ordersResult] = await Promise.allSettled([
         getAdminDashboardSummary(),
         getAdminDashboardRecentOrders(),
       ]);
 
       if (requestId !== requestIdRef.current) return;
 
-      setSummary(dashboardSummary);
-      setRecentOrders(orders);
+      const failures: string[] = [];
+
+      if (summaryResult.status === "fulfilled") {
+        setSummary(summaryResult.value);
+      } else {
+        setSummary(null);
+        failures.push("Marketplace statistics could not be loaded.");
+      }
+
+      if (ordersResult.status === "fulfilled") {
+        setRecentOrders(ordersResult.value);
+      } else {
+        setRecentOrders([]);
+        failures.push("Recent orders could not be loaded.");
+      }
+
+      setError(failures.join(" "));
     } catch (err) {
       if (requestId !== requestIdRef.current) return;
 
@@ -329,16 +344,30 @@ export default function AdminDashboardPage() {
 
     const run = async () => {
       try {
-        const [dashboardSummary, orders] = await Promise.all([
+        const [summaryResult, ordersResult] = await Promise.allSettled([
           getAdminDashboardSummary(),
           getAdminDashboardRecentOrders(),
         ]);
 
         if (cancelled || requestId !== requestIdRef.current) return;
 
-        setSummary(dashboardSummary);
-        setRecentOrders(orders);
-        setError("");
+        const failures: string[] = [];
+
+        if (summaryResult.status === "fulfilled") {
+          setSummary(summaryResult.value);
+        } else {
+          setSummary(null);
+          failures.push("Marketplace statistics could not be loaded.");
+        }
+
+        if (ordersResult.status === "fulfilled") {
+          setRecentOrders(ordersResult.value);
+        } else {
+          setRecentOrders([]);
+          failures.push("Recent orders could not be loaded.");
+        }
+
+        setError(failures.join(" "));
       } catch (err) {
         if (cancelled || requestId !== requestIdRef.current) return;
 
@@ -390,7 +419,7 @@ export default function AdminDashboardPage() {
             disabled={loading}
             sx={{ minHeight: 44, flexShrink: 0, borderRadius: 2 }}
           >
-            {loading ? "RefreshingÃ¢â‚¬Â¦" : "Refresh"}
+            {loading ? "Refreshing…" : "Refresh"}
           </Button>
         }
       />
@@ -690,14 +719,14 @@ export default function AdminDashboardPage() {
                           variant="body2"
                           sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
                         >
-                          {order.shippingFullName || "Ã¢â‚¬â€"}
+                          {order.shippingFullName || "—"}
                         </Typography>
                         <Typography
                           variant="caption"
                           color="text.secondary"
                           sx={{ display: "block", overflowWrap: "anywhere" }}
                         >
-                          {order.shippingCity || "Ã¢â‚¬â€"}
+                          {order.shippingCity || "—"}
                         </Typography>
                       </TableCell>
 
@@ -717,10 +746,10 @@ export default function AdminDashboardPage() {
 
                       <TableCell sx={{ minWidth: 125 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {order.paymentMethod || "Ã¢â‚¬â€"}
+                          {order.paymentMethod || "—"}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {order.paymentStatus || "Ã¢â‚¬â€"}
+                          {order.paymentStatus || "—"}
                         </Typography>
                       </TableCell>
 
