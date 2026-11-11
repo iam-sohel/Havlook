@@ -675,7 +675,7 @@ export default function Navbar() {
               <ListItem disablePadding>
                 <ListItemButton
                   component={Link}
-                  href="/account/addresses"
+                  href="/account"
                   onClick={closeMobileMenu}
                   sx={{
                     borderRadius: 2,
