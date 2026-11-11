@@ -197,12 +197,15 @@ function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage
     pageValue === undefined || pageValue === null
       ? requestedPage
       : asNonNegativeInteger(pageValue, "page number");
-  const size = asNonNegativeInteger(record.size, "page size");
+  const size = asNonNegativeInteger(record.size ?? nestedPage?.size, "page size");
   const totalElements = asNonNegativeInteger(
-    record.totalElements,
+    record.totalElements ?? nestedPage?.totalElements,
     "totalElements",
   );
-  const totalPages = asNonNegativeInteger(record.totalPages, "totalPages");
+  const totalPages = asNonNegativeInteger(
+    record.totalPages ?? nestedPage?.totalPages,
+    "totalPages",
+  );
 
   if (size === 0 && totalElements > 0) {
     throw new Error(
@@ -216,8 +219,8 @@ function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage
     size,
     totalElements,
     totalPages,
-    first: asOptionalBoolean(record, "first"),
-    last: asOptionalBoolean(record, "last"),
+    first: asOptionalBoolean(record, "first") ?? asOptionalBoolean(nestedPage ?? {}, "first"),
+    last: asOptionalBoolean(record, "last") ?? asOptionalBoolean(nestedPage ?? {}, "last"),
   };
 }
 
