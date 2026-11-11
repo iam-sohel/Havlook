@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -105,48 +105,55 @@ export default function AccountPage() {
     [profile.firstName, profile.lastName],
   );
 
-  const loadProfile = useCallback(async (signal?: AbortSignal) => {
-    setLoadingProfile(true);
-    try {
-      const response = await getMyProfile(signal);
-      if (signal?.aborted) return;
-
-      if (response.ok && response.data) {
-        const nextProfile = {
-          firstName: response.data.firstName ?? "",
-          lastName: response.data.lastName ?? "",
-          email: response.data.email ?? "",
-          phone: response.data.phone ?? "",
-        };
-        setProfile(nextProfile);
-        setPageError(null);
-        useAuthStore.setState({
-          user: {
-            id: response.data.id,
-            firstName: nextProfile.firstName,
-            lastName: nextProfile.lastName,
-            email: nextProfile.email,
-            phone: nextProfile.phone,
-          },
-        });
-      } else {
-        setPageError("We couldn't load your profile. Please try again.");
-      }
-    } catch {
-      if (!signal?.aborted) {
-        setPageError("We couldn't load your profile. Check your connection and retry.");
-      }
-    } finally {
-      if (!signal?.aborted) setLoadingProfile(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!token) return;
+
     const controller = new AbortController();
-    void loadProfile(controller.signal);
+
+    const fetchProfile = async () => {
+      try {
+        const response = await getMyProfile(controller.signal);
+        if (controller.signal.aborted) return;
+
+        if (response.ok && response.data) {
+          const nextProfile = {
+            firstName: response.data.firstName ?? "",
+            lastName: response.data.lastName ?? "",
+            email: response.data.email ?? "",
+            phone: response.data.phone ?? "",
+          };
+
+          setProfile(nextProfile);
+          setPageError(null);
+
+          useAuthStore.setState({
+            user: {
+              id: response.data.id,
+              firstName: nextProfile.firstName,
+              lastName: nextProfile.lastName,
+              email: nextProfile.email,
+              phone: nextProfile.phone,
+              role: useAuthStore.getState().user?.role,
+            },
+          });
+        } else {
+          setPageError("We couldn't load your profile. Please try again.");
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setPageError("We couldn't load your profile. Check your connection and retry.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingProfile(false);
+        }
+      }
+    };
+
+    void fetchProfile();
+
     return () => controller.abort();
-  }, [token, loadProfile]);
+  }, [token]);
 
   const handleProfileSubmit = async () => {
     if (savingProfile) return;
@@ -185,6 +192,7 @@ export default function AccountPage() {
             lastName: nextProfile.lastName,
             email: nextProfile.email,
             phone: nextProfile.phone,
+            role: useAuthStore.getState().user?.role,
           },
         });
         setProfileMessage("Your profile has been updated.");
@@ -316,7 +324,7 @@ export default function AccountPage() {
               </CardContent>
             </Card>
           ) : (
-            <Grid container spacing={3} alignItems="flex-start">
+            <Grid container spacing={3} sx={{ alignItems: "flex-start" }}>
               <Grid size={{ xs: 12, md: 4 }}>
                 <Stack spacing={2.5}>
                   <Card
@@ -448,7 +456,7 @@ export default function AccountPage() {
 
                   <Card sx={{ borderRadius: 4, border: "1px solid", borderColor: "divider", boxShadow: "0 12px 36px rgba(38, 31, 24, 0.04)" }}>
                     <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} sx={{ mb: 2.5 }}>
+                      <Stack direction="row" spacing={2} sx={{ mb: 2.5, alignItems: "center", justifyContent: "space-between" }}>
                         <Box>
                           <Typography variant="h6" sx={{ fontWeight: 800 }}>
                             {mode === "edit" ? "Edit personal details" : mode === "password" ? "Password & security" : "Personal information"}
@@ -496,10 +504,10 @@ export default function AccountPage() {
                             label="Mobile number"
                             value={profile.phone}
                             onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value.replace(/\D/g, "").slice(0, 10) }))}
-                            inputProps={{ inputMode: "numeric", maxLength: 10 }}
+                            slotProps={{ htmlInput: { inputMode: "numeric", maxLength: 10 } }}
                             autoComplete="tel"
                           />
-                          <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1.5} justifyContent="flex-end">
+                          <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1.5} sx={{ justifyContent: "flex-end" }}>
                             <Button variant="text" color="inherit" onClick={() => { setPageError(null); setMode("overview"); }}>Cancel</Button>
                             <Button variant="contained" onClick={() => void handleProfileSubmit()} disabled={savingProfile} sx={{ px: 3, borderRadius: 2, boxShadow: "none" }}>
                               {savingProfile ? "Saving…" : "Save changes"}
@@ -511,7 +519,7 @@ export default function AccountPage() {
                           <TextField fullWidth label="Current password" type="password" autoComplete="current-password" value={passwordFields.currentPassword} onChange={(event) => setPasswordFields((current) => ({ ...current, currentPassword: event.target.value }))} />
                           <TextField fullWidth label="New password" type="password" autoComplete="new-password" value={passwordFields.newPassword} onChange={(event) => setPasswordFields((current) => ({ ...current, newPassword: event.target.value }))} helperText="Use at least 8 characters." />
                           <TextField fullWidth label="Confirm new password" type="password" autoComplete="new-password" value={passwordFields.confirmPassword} onChange={(event) => setPasswordFields((current) => ({ ...current, confirmPassword: event.target.value }))} />
-                          <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1.5} justifyContent="flex-end">
+                          <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1.5} sx={{ justifyContent: "flex-end" }}>
                             <Button variant="text" color="inherit" onClick={() => { setPageError(null); setMode("overview"); }}>Cancel</Button>
                             <Button variant="contained" onClick={() => void handlePasswordSubmit()} disabled={changingPassword} sx={{ px: 3, borderRadius: 2, boxShadow: "none" }}>
                               {changingPassword ? "Updating…" : "Update password"}
@@ -542,7 +550,7 @@ export default function AccountPage() {
 
                   <Card sx={{ borderRadius: 4, border: "1px solid", borderColor: "divider", boxShadow: "none" }}>
                     <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "flex-start" }}>
                         <Box sx={{ width: 42, height: 42, display: "grid", placeItems: "center", borderRadius: 2, bgcolor: "#FFF1E6", color: "primary.main", flexShrink: 0 }}>
                           <SecurityOutlinedIcon />
                         </Box>
@@ -558,7 +566,7 @@ export default function AccountPage() {
 
                   <Card sx={{ borderRadius: 4, border: "1px solid", borderColor: "error.light", boxShadow: "none" }}>
                     <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-                      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between">
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }}>
                         <Box>
                           <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "error.main" }}>Deactivate account</Typography>
                           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
