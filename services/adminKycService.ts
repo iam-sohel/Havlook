@@ -106,6 +106,14 @@ function unwrap<T>(response: unknown): T {
   // Handle the backend CommonResponse envelope.
   const envelope = asRecord(payload);
 
+  if (envelope.success === false) {
+    const message =
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the KYC request.";
+    throw new Error(message);
+  }
+
   if (
     envelope.success === true &&
     "data" in envelope
@@ -223,6 +231,7 @@ export async function listAdminKyc(
     pendingOnly?: boolean;
     page?: number;
     size?: number;
+    signal?: AbortSignal;
   } = {},
 ): Promise<AdminSellerKycPage> {
   const page = options.page ?? 0;
@@ -236,6 +245,7 @@ export async function listAdminKyc(
     `${endpoint}${query(page, size)}`,
     {
       method: "GET",
+      signal: options.signal,
     },
   );
 
