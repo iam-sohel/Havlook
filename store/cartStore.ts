@@ -219,7 +219,7 @@ function apply(
     serverTotalItems: totalItems,
     serverProductPrice: response.productPrice,
     serverTotalDiscount: response.totalDiscount,
-    serverDeliveryCharge: response.deliveryCharge ?? 0,
+    serverDeliveryCharge: Number(response.deliveryCharge ?? response.shippingCharge ?? 0),
     loading: false,
     error: null,
   });
