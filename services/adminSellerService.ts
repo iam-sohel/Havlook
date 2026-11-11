@@ -104,18 +104,23 @@ function normalisePage(page: AdminSellerPage | null): AdminSellerPage | null {
     return null;
   }
 
+  const rawPage = page as unknown as Record<string, unknown>;
+  const nestedPage =
+    rawPage.page && typeof rawPage.page === "object" && !Array.isArray(rawPage.page)
+      ? (rawPage.page as Record<string, unknown>)
+      : {};
   const content = page.content
     .map(normaliseSeller)
     .filter((seller): seller is AdminSeller => seller !== null);
 
   return {
     content,
-    number: toCount(page.number) ?? 0,
-    size: toCount(page.size) ?? content.length,
-    totalElements: toCount(page.totalElements) ?? content.length,
-    totalPages: toCount(page.totalPages) ?? (content.length > 0 ? 1 : 0),
-    first: page.first !== false,
-    last: page.last !== false,
+    number: toCount(rawPage.number ?? nestedPage.number) ?? 0,
+    size: toCount(rawPage.size ?? nestedPage.size) ?? content.length,
+    totalElements: toCount(rawPage.totalElements ?? nestedPage.totalElements) ?? content.length,
+    totalPages: toCount(rawPage.totalPages ?? nestedPage.totalPages) ?? (content.length > 0 ? 1 : 0),
+    first: rawPage.first !== false && nestedPage.first !== false,
+    last: rawPage.last !== false && nestedPage.last !== false,
   };
 }
 
