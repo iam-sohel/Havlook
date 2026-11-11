@@ -166,7 +166,7 @@ export default function AdminOrdersPage() {
   const [totalElements, setTotalElements] =
     useState(0);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError("");
@@ -174,19 +174,24 @@ export default function AdminOrdersPage() {
       const result = await listAdminOrders(
         page,
         rowsPerPage,
-        statusFilter || undefined
+        statusFilter || undefined,
+        signal,
       );
+      if (signal?.aborted) return;
 
       setOrders(result.content);
       setTotalElements(result.totalElements);
     } catch (err) {
+      if (signal?.aborted) return;
       setError(
         err instanceof Error
           ? err.message
           : "Unable to load orders. Please try again."
       );
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [
     page,
@@ -195,17 +200,16 @@ export default function AdminOrdersPage() {
   ]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    const run = async () => {
-      if (cancelled) return;
-      await loadOrders();
-    };
-
-    void run();
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadOrders(controller.signal);
+      }
+    });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [loadOrders]);
 
