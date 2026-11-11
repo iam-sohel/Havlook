@@ -195,7 +195,13 @@ export default function AdminSellerKycPage() {
     if (!sellerId) return;
 
     const controller = new AbortController();
-    void loadKyc(controller.signal);
+
+    // Defer the state-updating loader outside the synchronous effect body.
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadKyc(controller.signal);
+      }
+    });
 
     return () => {
       controller.abort();
