@@ -174,6 +174,12 @@ function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage
     !Array.isArray(record.page)
       ? (record.page as UnknownRecord)
       : null;
+  const pageable =
+    record.pageable !== null &&
+    typeof record.pageable === "object" &&
+    !Array.isArray(record.pageable)
+      ? (record.pageable as UnknownRecord)
+      : null;
 
   const pageValue =
     record.number ??
@@ -183,7 +189,9 @@ function normalizePage(value: unknown, requestedPage: number): AdminCustomerPage
       : undefined) ??
     nestedPage?.number ??
     nestedPage?.pageNumber ??
-    nestedPage?.page;
+    nestedPage?.page ??
+    pageable?.pageNumber ??
+    pageable?.page;
 
   const page =
     pageValue === undefined || pageValue === null
