@@ -202,26 +202,15 @@ function normalisePage(value: unknown): AdminSellerKycPage {
     ? record.content.map(normaliseKyc)
     : [];
 
+  const nestedPage = asRecord(record.page);
   return {
     content,
-
-    page: Number(record.page ?? 0),
-
-    size: Number(
-      record.size ?? content.length,
-    ),
-
-    totalElements: Number(
-      record.totalElements ?? content.length,
-    ),
-
-    totalPages: Number(
-      record.totalPages ??
-        (content.length ? 1 : 0),
-    ),
-
-    first: asOptionalBoolean(record.first),
-    last: asOptionalBoolean(record.last),
+    page: Number(record.number ?? nestedPage.number ?? record.pageNumber ?? 0),
+    size: Number(record.size ?? nestedPage.size ?? content.length),
+    totalElements: Number(record.totalElements ?? nestedPage.totalElements ?? content.length),
+    totalPages: Number(record.totalPages ?? nestedPage.totalPages ?? (content.length ? 1 : 0)),
+    first: asOptionalBoolean(record.first) ?? asOptionalBoolean(nestedPage.first),
+    last: asOptionalBoolean(record.last) ?? asOptionalBoolean(nestedPage.last),
   };
 }
 
