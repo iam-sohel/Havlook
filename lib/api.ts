@@ -65,7 +65,7 @@ interface RequestOptions {
   /** extra headers, e.g. Idempotency-Key */
   headers?: Record<string, string>;
   /**
-   * Opt this request OUT of the automatic 401/403/500 → refresh → retry flow.
+   * Opt this request OUT of the automatic 401/403 → refresh → retry flow.
    * Set on the auth endpoints themselves (login / register / refresh / logout)
    * so the refresh machinery is never triggered by — or recursed into — an
    * auth call. The `/refresh` call in particular MUST set this so a failed
@@ -195,6 +195,12 @@ export async function apiRequest<T>(
 
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 
+  // Temporary server-side diagnostics for the public catalogue only.
+  const debugCatalogue =
+    typeof window === "undefined" &&
+    method === "GET" &&
+    path.split("?")[0] === "/api/v1/products";
+
   const resolvedToken = resolveToken(token);
 
   // FormData (multipart) bodies must keep the browser-generated multipart
@@ -226,6 +232,14 @@ export async function apiRequest<T>(
       cache: "no-store",
     });
   } catch (networkError) {
+    if (debugCatalogue) {
+      console.error("[HAVLOOK_CATALOGUE_FETCH_ERROR]", {
+        url: url.split("?")[0],
+        message: networkError instanceof Error ? networkError.message : "Unknown network error",
+        name: networkError instanceof Error ? networkError.name : "UnknownError",
+      });
+    }
+
     return {
       ok: false,
       status: 0,
@@ -234,6 +248,16 @@ export async function apiRequest<T>(
           ? networkError.message
           : "Network error. Please try again.",
     };
+  }
+
+  if (debugCatalogue) {
+    console.log("[HAVLOOK_CATALOGUE_HTTP]", {
+      url: url.split("?")[0],
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+      cfRay: response.headers.get("cf-ray"),
+      redirected: response.redirected,
+    });
   }
 
   // 204 No Content etc — treat as success with undefined data
@@ -246,9 +270,31 @@ export async function apiRequest<T>(
   if (contentType.includes("application/json")) {
     try {
       payload = await response.json();
-    } catch {
+    } catch (parseError) {
+      if (debugCatalogue) {
+        console.error("[HAVLOOK_CATALOGUE_JSON_ERROR]", {
+          name: parseError instanceof Error ? parseError.name : "UnknownError",
+        });
+      }
       payload = null;
     }
+  }
+
+  if (debugCatalogue) {
+    const envelope = payload as {
+      success?: boolean;
+      data?: { content?: unknown[] };
+    } | null;
+
+    console.log("[HAVLOOK_CATALOGUE_RESPONSE]", {
+      url: url.split("?")[0],
+      status: response.status,
+      contentType,
+      success: envelope?.success,
+      productCount: Array.isArray(envelope?.data?.content)
+        ? envelope.data.content.length
+        : null,
+    });
   }
 
   if (response.ok) {
