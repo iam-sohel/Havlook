@@ -1,0 +1,20 @@
+
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "havlook-frontend",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-14",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "NEXT_PUBLIC_API_BASE_URL": "https://api.havlook.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
