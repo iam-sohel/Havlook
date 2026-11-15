@@ -503,9 +503,27 @@ export default function OrderDetailsPage() {
                   <Typography
                     sx={{ fontWeight: 600 }}
                   >
-                    Cash on Delivery
+                    {order.paymentMethod === "COD"
+                      ? "Cash on Delivery"
+                      : order.paymentMethod === "ONLINE"
+                        ? "Online Payment"
+                        : "Not available"}
                   </Typography>
                 </Box>
+
+                {order.paymentStatus && (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Typography>Payment Status</Typography>
+                    <Typography sx={{ fontWeight: 600, textTransform: "capitalize" }}>
+                      {order.paymentStatus.toLowerCase().replaceAll("_", " ")}
+                    </Typography>
+                  </Box>
+                )}
 
                 <Divider />
 

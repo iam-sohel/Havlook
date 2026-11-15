@@ -106,6 +106,14 @@ function unwrap<T>(response: unknown): T {
   // Handle the backend CommonResponse envelope.
   const envelope = asRecord(payload);
 
+  if (envelope.success === false) {
+    const message =
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the KYC request.";
+    throw new Error(message);
+  }
+
   if (
     envelope.success === true &&
     "data" in envelope
@@ -202,26 +210,15 @@ function normalisePage(value: unknown): AdminSellerKycPage {
     ? record.content.map(normaliseKyc)
     : [];
 
+  const nestedPage = asRecord(record.page);
   return {
     content,
-
-    page: Number(record.page ?? 0),
-
-    size: Number(
-      record.size ?? content.length,
-    ),
-
-    totalElements: Number(
-      record.totalElements ?? content.length,
-    ),
-
-    totalPages: Number(
-      record.totalPages ??
-        (content.length ? 1 : 0),
-    ),
-
-    first: asOptionalBoolean(record.first),
-    last: asOptionalBoolean(record.last),
+    page: Number(record.number ?? nestedPage.number ?? record.pageNumber ?? 0),
+    size: Number(record.size ?? nestedPage.size ?? content.length),
+    totalElements: Number(record.totalElements ?? nestedPage.totalElements ?? content.length),
+    totalPages: Number(record.totalPages ?? nestedPage.totalPages ?? (content.length ? 1 : 0)),
+    first: asOptionalBoolean(record.first) ?? asOptionalBoolean(nestedPage.first),
+    last: asOptionalBoolean(record.last) ?? asOptionalBoolean(nestedPage.last),
   };
 }
 
@@ -234,6 +231,7 @@ export async function listAdminKyc(
     pendingOnly?: boolean;
     page?: number;
     size?: number;
+    signal?: AbortSignal;
   } = {},
 ): Promise<AdminSellerKycPage> {
   const page = options.page ?? 0;
@@ -247,6 +245,7 @@ export async function listAdminKyc(
     `${endpoint}${query(page, size)}`,
     {
       method: "GET",
+      signal: options.signal,
     },
   );
 
@@ -259,11 +258,13 @@ export async function listAdminKyc(
 
 export async function getAdminKyc(
   sellerId: number | string,
+  signal?: AbortSignal,
 ): Promise<AdminSellerKyc> {
   const response = await apiRequest(
     `/api/v1/admin/sellers/${sellerId}/kyc`,
     {
       method: "GET",
+      signal,
     },
   );
 
@@ -285,6 +286,7 @@ export async function approveAdminKyc(
   );
 
   throwIfFailed(response, "Unable to approve seller KYC.");
+  unwrap<unknown>(response);
 }
 
 export async function rejectAdminKyc(
@@ -310,4 +312,5 @@ export async function rejectAdminKyc(
   );
 
   throwIfFailed(response, "Unable to reject seller KYC.");
+  unwrap<unknown>(response);
 }

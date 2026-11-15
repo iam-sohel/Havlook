@@ -1,5 +1,5 @@
 /**
- * HAVLOOK — Cart service boundary.
+ * HAVLOOK - Cart service boundary.
  *
  * Backend is the authoritative source for cart contents,
  * prices, discounts and totals.
@@ -7,9 +7,9 @@
 
 import { apiRequest, type ApiResult } from "@/lib/api";
 
-/* ─────────────────────────────────────────────────────────────────────
-   Wire types — matches Spring Boot CartResponseDTO
-   ───────────────────────────────────────────────────────────────────── */
+/* ---------------------------------------------------------------------
+   Wire types - matches Spring Boot CartResponseDTO
+   --------------------------------------------------------------------- */
 
 export interface CartItemWire {
   id: number;
@@ -43,16 +43,15 @@ export interface CartResponseWire {
   /** Total discount applied. */
   totalDiscount: number;
 
-  /** Final payable cart total. */
+  /** Product subtotal after discounts, excluding delivery. */
   orderTotal: number;
 
-  /** Backend-calculated delivery charge. */
-  shippingCharge?: number;
-}
+  /** Canonical backend delivery charge. */
+  deliveryCharge?: number | string | null;
 
-/* ─────────────────────────────────────────────────────────────────────
-   Number coercion
-   ───────────────────────────────────────────────────────────────────── */
+  /** Legacy backend alias. */
+  shippingCharge?: number | string | null;
+}
 
 function toNumber(v: unknown): number {
   if (typeof v === "number") {
@@ -92,22 +91,17 @@ function unwrapCartResponse(
 function normaliseItem(raw: CartItemWire): CartItemWire {
   return {
     ...raw,
-
     id: toNumber(raw.id),
     productId: toNumber(raw.productId),
     productVariantId: toNumber(raw.productVariantId),
-
     unitPrice: toNumber(raw.unitPrice),
-
     quantity:
       typeof raw.quantity === "number"
         ? raw.quantity
         : toNumber(raw.quantity),
-
     lineTotal: toNumber(raw.lineTotal),
   };
 }
-
 function normaliseCart(raw: CartResponseWire): CartResponseWire {
   return {
     ...raw,
@@ -127,13 +121,14 @@ function normaliseCart(raw: CartResponseWire): CartResponseWire {
 
     orderTotal: toNumber(raw.orderTotal),
 
-    shippingCharge: toNumber(raw.shippingCharge),
+    deliveryCharge: toNumber(raw.deliveryCharge ?? raw.shippingCharge),
+    shippingCharge: toNumber(raw.deliveryCharge ?? raw.shippingCharge),
   };
 }
 
-/* ─────────────────────────────────────────────────────────────────────
+/* ---------------------------------------------------------------------
    Endpoints
-   ───────────────────────────────────────────────────────────────────── */
+   --------------------------------------------------------------------- */
 
 const ENDPOINTS = {
   cart: "/api/v1/cart",
@@ -147,9 +142,9 @@ const ENDPOINTS = {
     `/api/v1/cart/items/${encodeURIComponent(String(cartItemId))}`,
 } as const;
 
-/* ─────────────────────────────────────────────────────────────────────
+/* ---------------------------------------------------------------------
    Public API
-   ───────────────────────────────────────────────────────────────────── */
+   --------------------------------------------------------------------- */
 
 /** GET /api/v1/cart */
 export async function getCart(
@@ -181,7 +176,7 @@ export async function getCart(
  *   productVariantId
  *   quantity
  *
- * `productId` is intentionally NOT sent — the backend DTO does not declare
+ * `productId` is intentionally NOT sent - the backend DTO does not declare
  * it. Callers keep the product ID locally for UI metadata only.
  */
 export async function addItemToCart(

@@ -62,7 +62,9 @@ export default function CartOrderSummary({
   const safeItemCount = toSafeNumber(itemCount);
 
   const showDiscount = safeTotalDiscount > 0;
-  const totalPayable = safeOrderTotal;
+  // The backend's orderTotal is the discounted merchandise subtotal.
+  // Delivery is returned separately, so include it in the payable total.
+  const totalPayable = safeOrderTotal + safeDeliveryCharge;
 
   return (
     <Box
@@ -143,15 +145,10 @@ export default function CartOrderSummary({
             sx={{
               fontWeight: 600,
               fontVariantNumeric: "tabular-nums",
-              color:
-                safeDeliveryCharge === 0
-                  ? "success.main"
-                  : "text.primary",
+              color: "text.primary",
             }}
           >
-            {safeDeliveryCharge === 0
-              ? "Free"
-              : `₹${formatMoney(safeDeliveryCharge)}`}
+            ₹{formatMoney(safeDeliveryCharge)}
           </Typography>
         </Stack>
       </Stack>

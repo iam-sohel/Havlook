@@ -61,6 +61,30 @@ function unwrap<T>(payload: unknown, fallback: T): T {
   return fallback;
 }
 
+
+function backendFailure(
+  response: { status: number; data: unknown },
+): { ok: false; status: number; message: string } | null {
+  const payload = response.data;
+
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const envelope = payload as { success?: unknown; message?: unknown };
+
+  if (envelope.success !== false) return null;
+
+  return {
+    ok: false,
+    status: response.status,
+    message:
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the request.",
+  };
+}
+
 function toNumber(value: unknown): number | null {
   const numberValue = Number(value ?? 0);
 
@@ -170,6 +194,9 @@ export async function getAdminSellerKyc(
 
   if (!res.ok) return res;
 
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
+
   const kyc = normalizeKyc(
     unwrap<AdminSellerKyc | null>(res.data, null)
   );
@@ -208,6 +235,9 @@ export async function approveAdminSellerKyc(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
 
   return {
     ok: true,
@@ -257,6 +287,9 @@ export async function rejectAdminSellerKyc(
   );
 
   if (!res.ok) return res;
+
+  const backendError = backendFailure(res);
+  if (backendError) return backendError;
 
   return {
     ok: true,

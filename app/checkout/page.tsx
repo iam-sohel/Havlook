@@ -33,7 +33,8 @@ import {
 } from "@/components/auth/validation";
 
 import { checkout as apiCheckout } from "@/services/orderService";
-import { createAddress as apiCreateAddress } from "@/services/addressService";
+// Address creation goes through the store so the saved-address list is
+// updated immediately and checkout retries can reuse the newly created ID.
 import {
   createPayment,
   verifyPayment,
@@ -73,16 +74,21 @@ export default function CheckoutPage() {
   const { checking, authed } = useRequireAuth("/checkout");
 
   const items = useCartStore((s) => s.items);
+  const cartLoading = useCartStore((s) => s.loading);
+  const cartError = useCartStore((s) => s.error);
   const serverGrandTotal = useCartStore((s) => s.serverGrandTotal);
+const serverDeliveryCharge = useCartStore((s) => s.serverDeliveryCharge);
   const clearCart = useCartStore((s) => s.clearCart);
   const fetchCart = useCartStore((s) => s.fetchCart);
 
   const fetchAddresses = useAddressStore((s) => s.fetchAll);
+  const createAddress = useAddressStore((s) => s.create);
   const addresses = useAddressStore((s) => s.items);
 
   const [selectedAddressId, setSelectedAddressId] = useState<
       number | null
   >(null);
+  const [cartInitialised, setCartInitialised] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
@@ -107,7 +113,7 @@ export default function CheckoutPage() {
     }
 
     void fetchAddresses();
-    void fetchCart();
+    void fetchCart().finally(() => setCartInitialised(true));
   }, [checking, authed, fetchAddresses, fetchCart]);
 
   /**
@@ -182,13 +188,10 @@ export default function CheckoutPage() {
   /**
    * Checkout preview only. The backend remains authoritative when creating
    * the order and calculating the final payment amount.
-   *
-   * `serverGrandTotal` is the cart merchandise subtotal returned by the
-   * cart API. Delivery is previewed here using the configured business rule.
    */
   const subtotal = Number(serverGrandTotal || 0);
-  const shippingCharge = subtotal < 249 ? 25 : 49;
-  const total = subtotal + shippingCharge;
+  const deliveryCharge = Number(serverDeliveryCharge || 0);
+  const total = subtotal + deliveryCharge;
 
   /**
    * Synchronize the cart after a successful order/payment.
@@ -400,9 +403,9 @@ export default function CheckoutPage() {
        * the values currently entered in the form.
        */
       const selectedAddress =
-          selectedAddressId !== null
+          effectiveSelectedAddressId !== null
               ? addresses.find(
-                  (address) => address.id === selectedAddressId
+                  (address) => address.id === effectiveSelectedAddressId
               )
               : undefined;
 
@@ -425,7 +428,7 @@ export default function CheckoutPage() {
          * Customer entered a new/changed address.
          * Save it before creating the order.
          */
-        const createRes = await apiCreateAddress({
+        const createRes = await createAddress({
           fullName: fullName.trim(),
           phoneNumber: phone.trim(),
           streetAddress: addressLine.trim(),
@@ -523,12 +526,66 @@ export default function CheckoutPage() {
     pincode,
     checking,
     authed,
-    selectedAddressId,
+    effectiveSelectedAddressId,
     addresses,
+    createAddress,
     paymentMethod,
     finishSuccessfulOrder,
     startOnlinePayment,
   ]);
+
+  /**
+   * Authentication hydration state.
+   */
+  if (checking) {
+    return (
+      <>
+        <Header />
+        <Container maxWidth="md" sx={{ py: 10, textAlign: "center" }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Checking your account...
+          </Typography>
+          <Typography sx={{ mt: 1, color: "text.secondary" }}>
+            Please wait.
+          </Typography>
+        </Container>
+        <Footer />
+      </>
+    );
+  }
+
+  /** Cart must finish loading before an empty state is shown. */
+  if (cartLoading || !cartInitialised) {
+    return (
+      <>
+        <Header />
+        <Container maxWidth="md" sx={{ py: 10, textAlign: "center" }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Loading your cart...
+          </Typography>
+          <Typography sx={{ mt: 1, color: "text.secondary" }}>
+            Please wait while we sync your latest cart from HavLook.
+          </Typography>
+        </Container>
+        <Footer />
+      </>
+    );
+  }
+
+  if (cartError) {
+    return (
+      <>
+        <Header />
+        <Container maxWidth="md" sx={{ py: 10 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>{cartError}</Alert>
+          <Button variant="contained" onClick={() => void fetchCart()}>
+            Retry loading cart
+          </Button>
+        </Container>
+        <Footer />
+      </>
+    );
+  }
 
   /**
    * Empty cart state.
@@ -577,45 +634,6 @@ export default function CheckoutPage() {
             >
               Continue Shopping
             </Button>
-          </Container>
-
-          <Footer />
-        </>
-    );
-  }
-
-  /**
-   * Authentication hydration state.
-   */
-  if (checking) {
-    return (
-        <>
-          <Header />
-
-          <Container
-              maxWidth="md"
-              sx={{
-                py: 10,
-                textAlign: "center",
-              }}
-          >
-            <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                }}
-            >
-              Checking your account...
-            </Typography>
-
-            <Typography
-                sx={{
-                  mt: 1,
-                  color: "text.secondary",
-                }}
-            >
-              Please wait.
-            </Typography>
           </Container>
 
           <Footer />
@@ -687,8 +705,8 @@ export default function CheckoutPage() {
 
                         <RadioGroup
                             value={
-                              selectedAddressId !== null
-                                  ? String(selectedAddressId)
+                              effectiveSelectedAddressId !== null
+                                  ? String(effectiveSelectedAddressId)
                                   : ""
                             }
                             onChange={(event) =>
@@ -709,7 +727,7 @@ export default function CheckoutPage() {
                                     sx={{
                                       border: 1,
                                       borderColor:
-                                          selectedAddressId === address.id
+                                          effectiveSelectedAddressId === address.id
                                               ? "primary.main"
                                               : "divider",
                                       borderRadius: 2,
@@ -1052,11 +1070,11 @@ export default function CheckoutPage() {
                       mb: 2,
                     }}
                 >
-                  <Typography>Shipping</Typography>
+                  <Typography>Delivery Charge</Typography>
 
                   <Typography sx={{ fontWeight: 600 }}>
                     {"₹" +
-                        shippingCharge.toLocaleString("en-IN", {
+                        deliveryCharge.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}

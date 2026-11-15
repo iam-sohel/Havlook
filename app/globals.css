@@ -88,3 +88,16 @@ body.no-transitions *::before,
 body.no-transitions *::after {
   transition: none !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MOBILE BOTTOM NAVIGATION SAFE AREA
+   Push page content up on mobile so it is not hidden behind
+   the fixed bottom navigation bar. Desktop (md+) uses the
+   header AppBar and does not need this offset.
+   ───────────────────────────────────────────────────────────── */
+@media (max-width: 899.95px) {
+  html,
+  body {
+    padding-bottom: 64px;
+  }
+}

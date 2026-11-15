@@ -155,7 +155,7 @@ const useAuthStore = create<AuthState>()(
              LOGIN
              ──────────────────────────────────────────────────────────────── */
 
-          async login(emailOrPhone, password, endpoint = "/api/v1/auth/login") {
+          async login(emailOrPhone, password, endpoint = "/api/v1/auth/customer/login") {
             set({
               loading: true,
               isAuthenticating: true,
@@ -166,15 +166,30 @@ const useAuthStore = create<AuthState>()(
                 emailOrPhone.trim(),
             );
 
-            const result = await authService.login(
-              {
-                ...(isPhone
+            let result: Awaited<ReturnType<typeof authService.login>>;
+
+            try {
+              result = await authService.login(
+                {
+                  ...(isPhone
                     ? { phone: emailOrPhone.trim() }
                     : { email: emailOrPhone.trim() }),
-                password,
-              },
-              endpoint,
-            );
+                  password,
+                },
+                endpoint,
+              );
+            } catch {
+              const message =
+                "Login failed due to a network or server error. Please try again.";
+
+              set({
+                loading: false,
+                isAuthenticating: false,
+                error: message,
+              });
+
+              return { ok: false, message };
+            }
 
             if (!result.ok) {
               set({

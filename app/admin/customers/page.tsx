@@ -44,38 +44,41 @@ export default function AdminCustomersPage() {
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalElements, setTotalElements] = useState(0);
 
-  const loadCustomers = useCallback(async () => {
+  const loadCustomers = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError("");
 
-      const result = await listAdminCustomers(page, rowsPerPage);
+      const result = await listAdminCustomers(page, rowsPerPage, signal);
+      if (signal?.aborted) return;
 
       setCustomers(result.content);
       setTotalElements(result.totalElements);
     } catch (err) {
+      if (signal?.aborted) return;
       setError(
         err instanceof Error
           ? err.message
           : "Unable to load customers. Please try again."
       );
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [page, rowsPerPage]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    const run = async () => {
-      if (cancelled) return;
-      await loadCustomers();
-    };
-
-    void run();
+    void Promise.resolve().then(() => {
+      if (!controller.signal.aborted) {
+        void loadCustomers(controller.signal);
+      }
+    });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [loadCustomers]);
 

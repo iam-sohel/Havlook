@@ -78,15 +78,26 @@ export interface AdminOrderPage {
 }
 
 function unwrap<T>(response: unknown): T {
-  if (
-    response &&
-    typeof response === "object" &&
-    "data" in response
-  ) {
-    return response.data as T;
+  const transport = asRecord(response);
+  const payload =
+    transport.ok === true && "data" in transport
+      ? transport.data
+      : response;
+  const envelope = asRecord(payload);
+
+  if (envelope.success === false) {
+    const message =
+      typeof envelope.message === "string" && envelope.message.trim()
+        ? envelope.message
+        : "The server rejected the order request.";
+    throw new Error(message);
   }
 
-  return response as T;
+  if (envelope.success === true && "data" in envelope) {
+    return envelope.data as T;
+  }
+
+  return payload as T;
 }
 
 /**
@@ -191,31 +202,28 @@ function normalizePage(
   value: unknown
 ): AdminOrderPage {
   const record = asRecord(value);
-  const content = Array.isArray(record.content)
-    ? record.content.map(normalizeOrder)
-    : [];
+  if (!Array.isArray(record.content)) {
+    throw new Error("Invalid API response: order page content must be an array.");
+  }
+  const content = record.content.map(normalizeOrder);
 
+  const nestedPage = asRecord(record.page);
   return {
     content,
-    page: toNumber(record.page),
-    size:
-      toNumber(record.size) ||
-      content.length,
-    totalElements: toNumber(
-      record.totalElements
-    ),
-    totalPages: toNumber(
-      record.totalPages
-    ),
-    first: asOptionalBoolean(record.first),
-    last: asOptionalBoolean(record.last),
+    page: toNumber(record.number ?? nestedPage.number ?? record.pageNumber),
+    size: toNumber(record.size ?? nestedPage.size) || content.length,
+    totalElements: toNumber(record.totalElements ?? nestedPage.totalElements),
+    totalPages: toNumber(record.totalPages ?? nestedPage.totalPages),
+    first: asOptionalBoolean(record.first) ?? asOptionalBoolean(nestedPage.first),
+    last: asOptionalBoolean(record.last) ?? asOptionalBoolean(nestedPage.last),
   };
 }
 
 export async function listAdminOrders(
   page = 0,
   size = 20,
-  status?: string
+  status?: string,
+  signal?: AbortSignal,
 ): Promise<AdminOrderPage> {
   const params = new URLSearchParams();
 
@@ -231,6 +239,7 @@ export async function listAdminOrders(
     `/api/v1/admin/orders?${params.toString()}`,
     {
       method: "GET",
+      signal,
     }
   );
 
