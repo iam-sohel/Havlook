@@ -57,9 +57,12 @@ export default async function HomePage() {
 
   /* ----------------------------- Deals subset --------------------------- */
 
+  const MOBILE_SUBCATEGORY_ID = 1;
+
   const dealProducts = allProducts
     .filter(
       (product) =>
+        Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID &&
         typeof product.discount === "number" &&
         Number.isFinite(product.discount) &&
         product.discount > 0 &&
