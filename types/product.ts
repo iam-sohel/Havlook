@@ -147,6 +147,8 @@ export interface Product {
 
   brand: string;
   category: string;
+  categoryId?: number | string;
+  subCategoryId?: number | string;
   categorySlug?: string;
 
   /** Primary image URL. Always present even when `images` is empty. */
