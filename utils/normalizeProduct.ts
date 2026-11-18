@@ -475,6 +475,10 @@ export function normalizeBackendProduct(
     brand: "",
 
     category: "",
+    categoryId: product.categoryId,
+
+    subCategoryId: product.subCategoryId,
+
 
     images: [],
 
@@ -619,6 +623,10 @@ export function normalizeBackendProductDetails(
       product.category ??
       product.categoryName ??
       "",
+
+    categoryId: product.categoryId,
+
+    subCategoryId: product.subCategoryId,
 
     images,
 
