@@ -42,15 +42,18 @@ export default async function HomePage() {
 
   /* --------------------------- Featured subset -------------------------- */
 
-  const explicitlyFeatured = allProducts.filter(
-    (product) => product.featured === true,
-  );
+  const FEATURED_CATEGORIES = new Set([
+    "mobiles",
+    "laptops",
+  ]);
 
-  const featuredProducts = (
-    explicitlyFeatured.length > 0
-      ? explicitlyFeatured
-      : allProducts
-  ).slice(0, 8);
+  const featuredProducts = allProducts
+    .filter((product) =>
+      FEATURED_CATEGORIES.has(
+        (product.category ?? "").trim().toLowerCase(),
+      ),
+    )
+    .slice(0, 8);
 
   /* ----------------------------- Deals subset --------------------------- */
 
