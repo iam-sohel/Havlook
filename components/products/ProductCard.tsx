@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import Image, { type StaticImageData } from "next/image";
@@ -44,6 +44,7 @@ interface ProductCardProps {
   brand?: string;
   bestseller?: boolean;
   newArrival?: boolean;
+  outOfStock?: boolean;
 }
 
 export default function ProductCard({
@@ -59,6 +60,7 @@ export default function ProductCard({
   brand = "HavLook",
   bestseller = false,
   newArrival = false,
+  outOfStock = false,
 }: ProductCardProps) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
 
@@ -246,6 +248,20 @@ export default function ProductCard({
             gap: 0.5,
           }}
         >
+          {outOfStock && (
+            <Chip
+              label="OUT OF STOCK"
+              size="small"
+              sx={{
+                bgcolor: "grey.800",
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: "0.7rem",
+                height: 22,
+              }}
+            />
+          )}
+
           {bestseller && (
             <Chip
               label="Bestseller"

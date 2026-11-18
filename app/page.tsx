@@ -1,5 +1,4 @@
-
-import { Box, Typography, Container } from "@mui/material";
+﻿import { Box, Typography, Container } from "@mui/material";
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -11,7 +10,7 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { getFeaturedProducts, getProductsBySubCategory, listProducts } from "@/services/productService";
+import { enrichProductListWithDetails, getFeaturedProducts, getProductsBySubCategory, listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
@@ -51,16 +50,24 @@ export default async function HomePage() {
 
   const MOBILE_SUBCATEGORY_ID = 1;
   const mobileProducts = mobileResult.ok ? mobileResult.data : [];
+  const enrichedMobileProducts = await enrichProductListWithDetails(mobileProducts);
 
-  const dealProducts = mobileProducts
-    .filter(
-      (product) =>
-        Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID &&
+  const dealProducts = enrichedMobileProducts
+    .filter((product) => {
+      const hasValidDiscount =
         typeof product.discount === "number" &&
         Number.isFinite(product.discount) &&
         product.discount > 0 &&
-        product.discount <= 100,
-    )
+        product.discount <= 100;
+
+      const hasValidPrice =
+        Number(product.originalPrice) > Number(product.price) &&
+        product.price > 0;
+      return (
+        Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID &&
+        hasValidDiscount && hasValidPrice
+      );
+    })
     .slice(0, 8)
     .map((product) => ({
       ...product,
