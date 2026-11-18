@@ -11,7 +11,7 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { listProducts } from "@/services/productService";
+import { getFeaturedProducts, getProductsBySubCategory, listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
@@ -24,7 +24,11 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
-  const result = await listProducts();
+  const [result, featuredProducts, mobileResult] = await Promise.all([
+    listProducts(),
+    getFeaturedProducts(),
+    getProductsBySubCategory(1),
+  ]);
 
   const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
@@ -42,24 +46,13 @@ export default async function HomePage() {
 
   /* --------------------------- Featured subset -------------------------- */
 
-  const FEATURED_CATEGORIES = new Set([
-    "mobiles",
-    "laptops",
-  ]);
-
-  const featuredProducts = allProducts
-    .filter((product) =>
-      FEATURED_CATEGORIES.has(
-        (product.category ?? "").trim().toLowerCase(),
-      ),
-    )
-    .slice(0, 8);
 
   /* ----------------------------- Deals subset --------------------------- */
 
   const MOBILE_SUBCATEGORY_ID = 1;
+  const mobileProducts = mobileResult.ok ? mobileResult.data : [];
 
-  const dealProducts = allProducts
+  const dealProducts = mobileProducts
     .filter(
       (product) =>
         Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID &&
