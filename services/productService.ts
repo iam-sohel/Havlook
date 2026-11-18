@@ -140,6 +140,12 @@ interface BackendProductSummaryPageResponse {
   message?: string;
   data?: {
     content?: BackendProductDto[];
+    page?: {
+      totalElements?: number;
+      totalPages?: number;
+      number?: number;
+      size?: number;
+    };
     totalElements?: number;
     totalPages?: number;
     number?: number;
@@ -622,6 +628,155 @@ export async function getProductsByCategory(
     );
 
   return normalizeProductSummaryPage(result);
+}
+
+/**
+ * Get random homepage Featured Products.
+ * 5 Electronics + 3 products from other categories.
+ */
+export async function getFeaturedProducts(): Promise<Product[]> {
+  const ELECTRONICS_CATEGORY_IDS = [1, 8, 16];
+  const OTHER_CATEGORY_IDS = [3, 10, 14, 19, 23, 24];
+  const PAGE_SIZE = 20;
+
+  const shuffle = <T,>(items: T[]): T[] => {
+    const result = [...items];
+
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+
+    return result;
+  };
+
+  const fetchRandomCategoryPage = async (
+    categoryId: number,
+  ): Promise<Product[]> => {
+    try {
+      const fetchPage = (page: number) =>
+        apiRequest<BackendProductSummaryPageResponse>(
+          `${ENDPOINTS.categoryProducts(categoryId)}?page=${page}&size=${PAGE_SIZE}`,
+          { method: "GET" },
+        );
+
+      const firstResult = await fetchPage(0);
+
+      if (!firstResult.ok) return [];
+
+      const firstData = firstResult.data?.data;
+      const firstContent = firstData?.content;
+
+      if (!Array.isArray(firstContent) || firstContent.length === 0) {
+        return [];
+      }
+
+      const totalPages = Math.max(
+        1,
+        firstData?.page?.totalPages ??
+          firstData?.totalPages ??
+          1,
+      );
+
+      const randomPage = Math.floor(Math.random() * totalPages);
+
+      const selectedResult =
+        randomPage === 0
+          ? firstResult
+          : await fetchPage(randomPage);
+
+      if (!selectedResult.ok) return [];
+
+      const content = selectedResult.data?.data?.content;
+
+      if (!Array.isArray(content)) return [];
+
+      return content
+        .map((dto) => {
+          try {
+            return normalizeBackendProduct(dto);
+          } catch {
+            return null;
+          }
+        })
+        .filter((product): product is Product => product !== null);
+    } catch {
+      return [];
+    }
+  };
+
+  const selectedOtherCategoryIds = shuffle(
+    OTHER_CATEGORY_IDS,
+  ).slice(0, 3);
+
+  const categoryIds = [
+    ...ELECTRONICS_CATEGORY_IDS,
+    ...selectedOtherCategoryIds,
+  ];
+
+  const categoryResults = await Promise.all(
+    categoryIds.map((id) => fetchRandomCategoryPage(id)),
+  );
+
+  const electronicsCandidates = categoryResults
+    .slice(0, ELECTRONICS_CATEGORY_IDS.length)
+    .flat();
+
+  const otherCandidatesByCategory = categoryResults.slice(
+    ELECTRONICS_CATEGORY_IDS.length,
+  );
+
+  const electronicsProducts = shuffle(
+    electronicsCandidates,
+  ).slice(0, 5);
+
+  const usedIds = new Set(
+    electronicsProducts.map((product) => String(product.id)),
+  );
+
+  const otherProducts = otherCandidatesByCategory
+    .map((products) => shuffle(products)[0])
+    .filter((product): product is Product => Boolean(product))
+    .filter((product) => {
+      const id = String(product.id);
+
+      if (usedIds.has(id)) return false;
+
+      usedIds.add(id);
+      return true;
+    });
+
+  const selectedProducts = [
+    ...electronicsProducts,
+    ...otherProducts,
+  ];
+
+  const detailedProducts: Product[] = [];
+
+  for (
+    let i = 0;
+    i < selectedProducts.length;
+    i += ENRICH_CONCURRENCY
+  ) {
+    const batch = selectedProducts.slice(
+      i,
+      i + ENRICH_CONCURRENCY,
+    );
+
+    const responses = await Promise.all(
+      batch.map((product) =>
+        getProductDetailsById(product.id).catch(() => null),
+      ),
+    );
+
+    responses.forEach((response) => {
+      if (response?.ok) {
+        detailedProducts.push(response.data);
+      }
+    });
+  }
+
+  return shuffle(detailedProducts).slice(0, 8);
 }
 
 /**

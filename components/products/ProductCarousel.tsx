@@ -49,6 +49,15 @@ export default function ProductCarousel({ products }: Props) {
             brand={product.brand}
             bestseller={product.bestseller}
             newArrival={product.newArrival}
+            outOfStock={
+              product.stockStatus === "OUT_OF_STOCK" ||
+              (!!product.variants?.length &&
+                product.variants.every(
+                  (variant) =>
+                    variant.available !== true ||
+                    variant.stockStatus === "OUT_OF_STOCK",
+                ))
+            }
           />
         </Box>
       ))}
