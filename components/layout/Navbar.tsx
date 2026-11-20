@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -69,6 +69,8 @@ const iconLinkSx = {
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
 
@@ -99,19 +101,34 @@ export default function Navbar() {
     }
   };
 
-  // Attach this to the TextField root so the key event bubbles from the
-  // native input through MUI consistently on both desktop and mobile.
-  // Read the value from the event target to avoid relying on a potentially
-  // stale React state snapshot during the Enter key event.
-  const handleSearchKeyDown = (
-    e: React.KeyboardEvent<HTMLDivElement>,
-  ) => {
-    if (e.key !== "Enter") return;
+  // Bind directly to the native input elements. This avoids depending on
+  // MUI TextField's synthetic key-event forwarding for Enter submissions.
+  useEffect(() => {
+    const handleNativeSearchKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter") return;
 
-    e.preventDefault();
-    e.stopPropagation();
-    navigateToSearch((e.target as HTMLInputElement).value);
-  };
+      event.preventDefault();
+      event.stopPropagation();
+
+      const query = (event.currentTarget as HTMLInputElement).value.trim();
+      if (!query) return;
+
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+      setSearchQuery("");
+      setMobileMenuOpen(false);
+    };
+
+    const desktopInput = desktopSearchInputRef.current;
+    const mobileInput = mobileSearchInputRef.current;
+
+    desktopInput?.addEventListener("keydown", handleNativeSearchKeyDown, true);
+    mobileInput?.addEventListener("keydown", handleNativeSearchKeyDown, true);
+
+    return () => {
+      desktopInput?.removeEventListener("keydown", handleNativeSearchKeyDown, true);
+      mobileInput?.removeEventListener("keydown", handleNativeSearchKeyDown, true);
+    };
+  }, [router]);
 
   const handleLogout = () => {
     // `logout()` centrally clears auth tokens plus local cart, wishlist,
@@ -248,7 +265,7 @@ export default function Navbar() {
             placeholder="Search for Products, Brands and More"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
+            inputRef={desktopSearchInputRef}
             sx={searchFieldSx}
             slotProps={{
               input: {
@@ -463,7 +480,7 @@ export default function Navbar() {
             onChange={(e) =>
               setSearchQuery(e.target.value)
             }
-            onKeyDown={handleSearchKeyDown}
+            inputRef={mobileSearchInputRef}
             sx={searchFieldSx}
             slotProps={{
               input: {
