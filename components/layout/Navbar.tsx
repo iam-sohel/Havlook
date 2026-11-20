@@ -90,22 +90,27 @@ export default function Navbar() {
 
   const wishlistCount = wishlistItems.length;
 
-  const navigateToSearch = () => {
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+  const navigateToSearch = (rawQuery: string = searchQuery) => {
+    const query = rawQuery.trim();
+    if (query) {
+      router.push(`/search?q=${encodeURIComponent(query)}`);
       setSearchQuery("");
       setMobileMenuOpen(false);
     }
   };
 
+  // Attach this to the TextField root so the key event bubbles from the
+  // native input through MUI consistently on both desktop and mobile.
+  // Read the value from the event target to avoid relying on a potentially
+  // stale React state snapshot during the Enter key event.
   const handleSearchKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>,
+    e: React.KeyboardEvent<HTMLDivElement>,
   ) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-      navigateToSearch();
-    }
+    if (e.key !== "Enter") return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    navigateToSearch((e.target as HTMLInputElement).value);
   };
 
   const handleLogout = () => {
@@ -243,13 +248,11 @@ export default function Navbar() {
             placeholder="Search for Products, Brands and More"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             sx={searchFieldSx}
             slotProps={{
               input: {
                 endAdornment: searchAdornment,
-              },
-              htmlInput: {
-                onKeyDown: handleSearchKeyDown,
               },
             }}
           />
@@ -460,13 +463,11 @@ export default function Navbar() {
             onChange={(e) =>
               setSearchQuery(e.target.value)
             }
+            onKeyDown={handleSearchKeyDown}
             sx={searchFieldSx}
             slotProps={{
               input: {
                 endAdornment: searchAdornment,
-              },
-              htmlInput: {
-                onKeyDown: handleSearchKeyDown,
               },
             }}
           />
