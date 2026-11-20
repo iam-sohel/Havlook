@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -69,8 +69,6 @@ const iconLinkSx = {
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const desktopSearchInputRef = useRef<HTMLInputElement>(null);
-  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
 
@@ -91,44 +89,6 @@ export default function Navbar() {
   );
 
   const wishlistCount = wishlistItems.length;
-
-  const navigateToSearch = (rawQuery: string = searchQuery) => {
-    const query = rawQuery.trim();
-    if (query) {
-      router.push(`/search?q=${encodeURIComponent(query)}`);
-      setSearchQuery("");
-      setMobileMenuOpen(false);
-    }
-  };
-
-  // Bind directly to the native input elements. This avoids depending on
-  // MUI TextField's synthetic key-event forwarding for Enter submissions.
-  useEffect(() => {
-    const handleNativeSearchKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Enter") return;
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const query = (event.currentTarget as HTMLInputElement).value.trim();
-      if (!query) return;
-
-      router.push(`/search?q=${encodeURIComponent(query)}`);
-      setSearchQuery("");
-      setMobileMenuOpen(false);
-    };
-
-    const desktopInput = desktopSearchInputRef.current;
-    const mobileInput = mobileSearchInputRef.current;
-
-    desktopInput?.addEventListener("keydown", handleNativeSearchKeyDown, true);
-    mobileInput?.addEventListener("keydown", handleNativeSearchKeyDown, true);
-
-    return () => {
-      desktopInput?.removeEventListener("keydown", handleNativeSearchKeyDown, true);
-      mobileInput?.removeEventListener("keydown", handleNativeSearchKeyDown, true);
-    };
-  }, [router]);
 
   const handleLogout = () => {
     // `logout()` centrally clears auth tokens plus local cart, wishlist,
@@ -187,7 +147,7 @@ export default function Navbar() {
   const searchAdornment = (
     <InputAdornment position="end" sx={{ pr: 0.75 }}>
       <IconButton
-        onClick={navigateToSearch}
+        type="submit"
         edge="end"
         aria-label="Search"
         sx={{
@@ -252,6 +212,9 @@ export default function Navbar() {
 
         {/* Search — the primary interaction of the header */}
         <Box
+          component="form"
+          action="/search"
+          method="GET"
           sx={{
             flex: 1,
             minWidth: 0,
@@ -262,10 +225,10 @@ export default function Navbar() {
           <TextField
             fullWidth
             size="small"
+            name="q"
             placeholder="Search for Products, Brands and More"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            inputRef={desktopSearchInputRef}
             sx={searchFieldSx}
             slotProps={{
               input: {
@@ -467,6 +430,9 @@ export default function Navbar() {
 
         {/* Mobile Search */}
         <Box
+          component="form"
+          action="/search"
+          method="GET"
           sx={{
             px: 1.5,
             pb: 1.5,
@@ -475,12 +441,12 @@ export default function Navbar() {
           <TextField
             fullWidth
             size="small"
+            name="q"
             placeholder="Search products, brands and more"
             value={searchQuery}
             onChange={(e) =>
               setSearchQuery(e.target.value)
             }
-            inputRef={mobileSearchInputRef}
             sx={searchFieldSx}
             slotProps={{
               input: {
