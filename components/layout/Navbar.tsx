@@ -98,11 +98,14 @@ export default function Navbar() {
     }
   };
 
-  const handleSearchSubmit = (
-    e: React.FormEvent<HTMLFormElement>,
+  const handleSearchKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
   ) => {
-    e.preventDefault();
-    navigateToSearch();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      navigateToSearch();
+    }
   };
 
   const handleLogout = () => {
@@ -227,8 +230,6 @@ export default function Navbar() {
 
         {/* Search — the primary interaction of the header */}
         <Box
-          component="form"
-          onSubmit={handleSearchSubmit}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -246,6 +247,9 @@ export default function Navbar() {
             slotProps={{
               input: {
                 endAdornment: searchAdornment,
+              },
+              htmlInput: {
+                onKeyDown: handleSearchKeyDown,
               },
             }}
           />
@@ -443,8 +447,6 @@ export default function Navbar() {
 
         {/* Mobile Search */}
         <Box
-          component="form"
-          onSubmit={handleSearchSubmit}
           sx={{
             px: 1.5,
             pb: 1.5,
@@ -462,6 +464,9 @@ export default function Navbar() {
             slotProps={{
               input: {
                 endAdornment: searchAdornment,
+              },
+              htmlInput: {
+                onKeyDown: handleSearchKeyDown,
               },
             }}
           />
