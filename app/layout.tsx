@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import ThemeRegistry from "@/components/providers/ThemeRegistry";
 import AuthClientBootstrap from "@/lib/authInterceptor";
+import AndroidBackButtonHandler from "@/components/providers/AndroidBackButtonHandler";
 
 import "./globals.css";
 
@@ -20,6 +21,7 @@ export default function RootLayout({
       <body>
         <ThemeRegistry>
           <AuthClientBootstrap />
+          <AndroidBackButtonHandler />
           {children}
         </ThemeRegistry>
       </body>
