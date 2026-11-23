@@ -78,7 +78,7 @@ const remotePatterns: RemotePattern[] = [
   {
     protocol: "https",
     hostname: "m.media-amazon.com",
-    pathname: "/images/**",
+    pathname: "/**",
   },
   ...apiRemotePattern(),
 
