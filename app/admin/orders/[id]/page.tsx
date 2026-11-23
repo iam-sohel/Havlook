@@ -92,40 +92,44 @@ export default function AdminOrderDetailsPage() {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
-  const loadOrder = useCallback(async () => {
+  const loadOrder = useCallback(async (isActive: () => boolean = () => true) => {
     if (!orderId || Number.isNaN(orderId)) {
-      setError("Invalid order ID.");
-      setLoading(false);
+      if (isActive()) {
+        setError("Invalid order ID.");
+        setLoading(false);
+      }
       return;
     }
 
     try {
-      setLoading(true);
-      setError("");
+      if (isActive()) {
+        setLoading(true);
+        setError("");
+      }
 
       const result = await getAdminOrder(orderId);
 
-      setOrder(result);
+      if (isActive()) {
+        setOrder(result);
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load order details.",
-      );
+      if (isActive()) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load order details.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (isActive()) {
+        setLoading(false);
+      }
     }
   }, [orderId]);
 
   useEffect(() => {
     let cancelled = false;
-
-    const run = async () => {
-      if (cancelled) return;
-      await loadOrder();
-    };
-
-    void run();
+    void loadOrder(() => !cancelled);
 
     return () => {
       cancelled = true;
