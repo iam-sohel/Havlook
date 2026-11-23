@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   Alert,
   Box,
@@ -11,8 +12,8 @@ import {
   Container,
   Divider,
   Grid,
-  Skeleton,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 
@@ -23,6 +24,9 @@ import useRequireAuth from "@/hooks/useRequireAuth";
 import { getOrders } from "@/services/orderService";
 import type { OrderResponseWire } from "@/services/orderService";
 import { formatPrice } from "@/utils/formatPrice";
+import { OrderEmptyState, OrderLoadingState } from "@/components/orders/OrderStates";
+import OrderStatusChip from "@/components/orders/OrderStatusChip";
+import OrderItem from "@/components/orders/OrderItem";
 
 type Order = OrderResponseWire;
 
@@ -58,69 +62,15 @@ function formatMoney(value?: string | number | null): string {
   return formatPrice(numberValue);
 }
 
-function getStatusColor(
-  status?: string | null
-):
-  | "default"
-  | "primary"
-  | "secondary"
-  | "success"
-  | "error"
-  | "warning"
-  | "info" {
-  const normalized = String(status || "").toUpperCase();
-
-  if (
-    normalized === "DELIVERED" ||
-    normalized === "COMPLETED" ||
-    normalized === "SUCCESS"
-  ) {
-    return "success";
-  }
-
-  if (
-    normalized === "CANCELLED" ||
-    normalized === "CANCELED" ||
-    normalized === "FAILED"
-  ) {
-    return "error";
-  }
-
-  if (
-    normalized === "SHIPPED" ||
-    normalized === "OUT_FOR_DELIVERY"
-  ) {
-    return "info";
-  }
-
-  if (
-    normalized === "PROCESSING" ||
-    normalized === "CONFIRMED" ||
-    normalized === "PLACED"
-  ) {
-    return "primary";
-  }
-
-  if (normalized === "PENDING") {
-    return "warning";
-  }
-
-  return "default";
-}
-
-function OrderSkeleton() {
-  return (
-    <Card sx={{ mb: 3 }}>
-      <CardContent>
-        <Skeleton width="35%" height={30} />
-        <Skeleton width="25%" />
-        <Skeleton width="100%" height={50} />
-        <Skeleton width="80%" />
-        <Skeleton width="60%" />
-      </CardContent>
-    </Card>
-  );
-}
+const STATUS_CHIPS: Array<{ value: string; label: string }> = [
+  { value: "ALL", label: "All orders" },
+  { value: "PENDING", label: "Pending" },
+  { value: "CONFIRMED", label: "Confirmed" },
+  { value: "PROCESSING", label: "Processing" },
+  { value: "SHIPPED", label: "Shipped" },
+  { value: "DELIVERED", label: "Delivered" },
+  { value: "CANCELLED", label: "Cancelled" },
+];
 
 export default function OrdersPage() {
   const { checking, authed } = useRequireAuth("/account/orders");
@@ -128,6 +78,9 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const loadOrders = useCallback(async () => {
     if (checking || !authed) {
@@ -172,6 +125,40 @@ export default function OrdersPage() {
     return () => window.clearTimeout(timer);
   }, [checking, authed, loadOrders]);
 
+  const availableStatuses = useMemo(() => {
+    const found = new Set<string>();
+    for (const order of orders) {
+      if (order.status) {
+        found.add(String(order.status).toUpperCase());
+      }
+    }
+    return STATUS_CHIPS.filter((chip) => chip.value === "ALL" || found.has(chip.value));
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    const status = statusFilter;
+
+    return orders.filter((order) => {
+      const matchesSearch =
+        !query ||
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.shippingFullName?.toLowerCase().includes(query) ||
+        order.shippingPhoneNumber?.toLowerCase().includes(query) ||
+        order.shippingCity?.toLowerCase().includes(query);
+
+      const matchesStatus =
+        status === "ALL" ||
+        String(order.status).toUpperCase() === status;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, search, statusFilter]);
+
+  if (checking || (!authed && !loading)) {
+    return null;
+  }
+
   return (
     <>
       <Header />
@@ -185,25 +172,13 @@ export default function OrdersPage() {
         }}
       >
         <Container maxWidth="lg">
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{
-              mb: 4,
-              justifyContent: "space-between",
-              alignItems: { xs: "flex-start", sm: "center" },
-            }}
-          >
+          <Stack spacing={3} sx={{ mb: 4 }}>
             <Box>
               <Typography
                 variant="h4"
                 sx={{
                   fontWeight: 700,
-                  fontSize: {
-                    xs: "1.7rem",
-                    sm: "2rem",
-                    md: "2.2rem",
-                  },
+                  fontSize: { xs: "1.7rem", sm: "2rem", md: "2.25rem" },
                 }}
               >
                 My Orders
@@ -214,17 +189,9 @@ export default function OrdersPage() {
                 color="text.secondary"
                 sx={{ mt: 0.5 }}
               >
-                View your recent orders and order details.
+                Track your recent orders and view order details.
               </Typography>
             </Box>
-
-            <Button
-              variant="outlined"
-              onClick={loadOrders}
-              disabled={loading}
-            >
-              Refresh
-            </Button>
           </Stack>
 
           {error && (
@@ -232,11 +199,7 @@ export default function OrdersPage() {
               severity="error"
               sx={{ mb: 3 }}
               action={
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={loadOrders}
-                >
+                <Button color="inherit" size="small" onClick={loadOrders}>
                   Retry
                 </Button>
               }
@@ -245,258 +208,250 @@ export default function OrdersPage() {
             </Alert>
           )}
 
-          {loading ? (
-            <>
-              <OrderSkeleton />
-              <OrderSkeleton />
-              <OrderSkeleton />
-            </>
-          ) : orders.length === 0 ? (
-            <Card>
-              <CardContent sx={{ py: 6, textAlign: "center" }}>
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  No orders yet
-                </Typography>
+          <Card sx={{ mb: 3 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search orders by order number, customer, phone or city"
+                  helperText="Searches your loaded orders"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  sx={{
+                    minHeight: 44,
+                    "& .MuiOutlinedInput-root": { minHeight: 44 },
+                  }}
+                />
 
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 1 }}
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 1,
+                    minWidth: 0,
+                  }}
                 >
-                  Your completed orders will appear here.
-                </Typography>
+                  {availableStatuses.map((chip) => {
+                    const active = statusFilter === chip.value;
+                    return (
+                      <Button
+                        key={chip.value}
+                        variant={active ? "contained" : "outlined"}
+                        color={active ? "primary" : "inherit"}
+                        size="small"
+                        onClick={() => setStatusFilter(chip.value)}
+                        sx={{
+                          minHeight: 36,
+                          textTransform: "none",
+                          fontWeight: 600,
+                          ...(active
+                            ? {
+                                bgcolor: "primary.main",
+                                color: "primary.contrastText",
+                                "&:hover": { bgcolor: "primary.dark" },
+                              }
+                            : {}),
+                        }}
+                      >
+                        {chip.label}
+                      </Button>
+                    );
+                  })}
+                </Box>
 
                 <Button
-                  variant="contained"
-                  href="/products"
-                  sx={{ mt: 3 }}
+                  variant="outlined"
+                  startIcon={<></>}
+                  onClick={loadOrders}
+                  disabled={loading}
+                  sx={{ minHeight: 44, minWidth: 100 }}
                 >
-                  Start Shopping
+                  {loading ? "Refreshing…" : "Refresh"}
                 </Button>
-              </CardContent>
-            </Card>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {loading ? (
+            <OrderLoadingState cards={3} />
+          ) : filteredOrders.length === 0 ? (
+            <OrderEmptyState
+              title={
+                search || statusFilter !== "ALL"
+                  ? "No matching orders"
+                  : "No orders yet"
+              }
+              description={
+                search || statusFilter !== "ALL"
+                  ? "Try changing your search or status filter."
+                  : "Your completed orders will appear here."
+              }
+              action={
+                search || statusFilter !== "ALL" ? null : (
+                  <Button
+                    component="a"
+                    href="/products"
+                    variant="contained"
+                    sx={{ minHeight: 44 }}
+                  >
+                    Start Shopping
+                  </Button>
+                )
+              }
+            />
           ) : (
-            <Stack spacing={3}>
-              {orders.map((order) => {
+            <Grid container spacing={3}>
+              {filteredOrders.map((order) => {
                 const items = order.items || [];
                 const visibleItems = items.slice(0, 3);
                 const remainingItems = Math.max(items.length - 3, 0);
 
+                const paymentMethod =
+                  order.paymentMethod === "COD"
+                    ? "Cash on Delivery"
+                    : order.paymentMethod === "ONLINE"
+                      ? "Online Payment"
+                      : "—";
+
                 return (
-                  <Card
+                  <Grid
                     key={order.id}
-                    sx={{
-                      borderRadius: 2,
-                      overflow: "hidden",
-                    }}
+                    size={{ xs: 12, sm: 6, lg: 4 }}
+                    sx={{ display: "flex" }}
                   >
-                    <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                      <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        spacing={2}
-                        sx={{
-                          justifyContent: "space-between",
-                          alignItems: { xs: "flex-start", sm: "center" },
-                        }}
-                      >
-                        <Box>
-                          <Typography
-                            variant="h6"
-                            sx={{ fontWeight: 700 }}
+                    <Card sx={{ height: "100%", borderRadius: 3, overflow: "hidden" }}>
+                      <CardContent sx={{ p: { xs: 2.5, sm: 3 }, display: "flex", flexDirection: "column", height: "100%" }}>
+                        <Stack spacing={1}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: 1,
+                            }}
                           >
-                            {"Order #" + (order.orderNumber || order.id)}
-                          </Typography>
-
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {formatDate(order.createdAt)}
-                          </Typography>
-                        </Box>
-
-                        <Chip
-                          label={order.status || "UNKNOWN"}
-                          color={getStatusColor(order.status)}
-                          size="small"
-                        />
-                      </Stack>
-
-                      <Divider sx={{ my: 2.5 }} />
-
-                      <Grid container spacing={3}>
-                        <Grid size={{ xs: 12, md: 7 }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1.5, fontWeight: 700 }}
-                          >
-                            Items
-                          </Typography>
-
-                          <Stack spacing={1.5}>
-                            {visibleItems.map((item) => (
-                              <Box key={item.id}>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ fontWeight: 600 }}
-                                >
-                                  {item.productName || "Product"}
-                                </Typography>
-
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                >
-                                  {"Qty: " +
-                                    (item.quantity ?? 0) +
-                                    " • ₹" +
-                                    formatMoney(item.lineTotal)}
-                                </Typography>
-                              </Box>
-                            ))}
-
-                            {remainingItems > 0 && (
+                            <Box sx={{ minWidth: 0 }}>
                               <Typography
-                                variant="body2"
+                                variant="h6"
+                                sx={{
+                                  fontWeight: 700,
+                                  overflowWrap: "anywhere",
+                                  minWidth: 0,
+                                }}
+                              >
+                                Order {order.orderNumber || `#${order.id}`}
+                              </Typography>
+
+                              <Typography
+                                variant="caption"
                                 color="text.secondary"
                               >
-                                {"+ " + remainingItems + " more"}
+                                Placed {formatDate(order.createdAt)}
                               </Typography>
-                            )}
+                            </Box>
 
-                            {items.length === 0 && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                No item information available.
+                            <OrderStatusChip status={order.status} />
+                          </Box>
+
+                          <Divider sx={{ my: 2 }} />
+
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ mb: 1, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}
+                            >
+                              Items
+                            </Typography>
+
+                            <Stack spacing={1}>
+                              {visibleItems.map((item) => (
+                                <OrderItem
+                                  key={item.id}
+                                  item={{
+                                    ...item,
+                                    image: undefined,
+                                  }}
+                                  showThumbnail
+                                />
+                              ))}
+
+                              {remainingItems > 0 && (
+                                <Typography variant="body2" color="text.secondary">
+                                  + {remainingItems} more item{remainingItems > 1 ? "s" : ""}
+                                </Typography>
+                              )}
+
+                              {items.length === 0 && (
+                                <Typography variant="body2" color="text.secondary">
+                                  No item information available.
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Box>
+
+                          <Divider sx={{ my: 2 }} />
+
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ mb: 0.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}
+                            >
+                              Order Total
+                            </Typography>
+
+                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                              {formatMoney(order.totalAmount)}
+                            </Typography>
+
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                mt: 1,
+                              }}
+                            >
+                              <Chip
+                                size="small"
+                                label={
+                                  order.paymentStatus
+                                    ? String(order.paymentStatus)
+                                        .replace(/_/g, " ")
+                                        .toLowerCase()
+                                        .replace(/\b\w/g, (c) => c.toUpperCase())
+                                    : "—"
+                                }
+                                sx={{ fontWeight: 600 }}
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {paymentMethod}
                               </Typography>
-                            )}
-                          </Stack>
-                        </Grid>
+                            </Box>
+                          </Box>
+                        </Stack>
 
-                        <Grid size={{ xs: 12, md: 5 }}>
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1.5, fontWeight: 700 }}
-                          >
-                            Order Total
-                          </Typography>
-
-                          <Typography
-                            variant="h6"
-                            sx={{ fontWeight: 700 }}
-                          >
-                            {"₹" + formatMoney(order.totalAmount)}
-                          </Typography>
-
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {order.currency || "INR"}
-                          </Typography>
-                        </Grid>
-                      </Grid>
-
-                      {(order.shippingFullName ||
-                        order.shippingStreetAddress ||
-                        order.shippingCity ||
-                        order.shippingState ||
-                        order.shippingPostalCode ||
-                        order.shippingCountry ||
-                        order.shippingPhoneNumber) && (
-                        <>
-                          <Divider sx={{ my: 2.5 }} />
-
-                          <Typography
-                            variant="subtitle1"
-                            sx={{ mb: 1, fontWeight: 700 }}
-                          >
-                            Shipping Address
-                          </Typography>
-
-                          {order.shippingFullName && (
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600 }}
-                            >
-                              {order.shippingFullName}
-                            </Typography>
-                          )}
-
-                          {order.shippingPhoneNumber && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {order.shippingPhoneNumber}
-                            </Typography>
-                          )}
-
-                          {order.shippingStreetAddress && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {order.shippingStreetAddress}
-                            </Typography>
-                          )}
-
-                          {order.shippingLandmark && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {order.shippingLandmark}
-                            </Typography>
-                          )}
-
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                          >
-                            {[
-                              order.shippingCity,
-                              order.shippingState,
-                              order.shippingPostalCode,
-                            ]
-                              .filter(Boolean)
-                              .join(", ")}
-                          </Typography>
-
-                          {order.shippingCountry && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {order.shippingCountry}
-                            </Typography>
-                          )}
-                        </>
-                      )}
-
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "flex-end",
-                          mt: 3,
-                        }}
-                      >
-                        <Button
-                          variant="outlined"
-                          href={"/account/orders/" + order.id}
+                        <Box
+                          sx={{
+                            marginTop: "auto",
+                            display: "flex",
+                            justifyContent: "flex-end",
+                          }}
                         >
-                          View Details
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
+                          <Button
+                            variant="outlined"
+                            href={"/account/orders/" + order.id}
+                            sx={{ minHeight: 44 }}
+                          >
+                            View Details
+                          </Button>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
                 );
               })}
-            </Stack>
+            </Grid>
           )}
         </Container>
       </Box>

@@ -4,12 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import {
+  Box,
   Button,
   Card,
   CardContent,
   Grid,
   MenuItem,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -107,15 +114,17 @@ export default function SellerOrdersPage() {
 
   if (loadError || !ordersPage) {
     return (
-      <SellerErrorState
-        message={loadError ?? "Could not load your orders."}
-        onRetry={() => void load()}
-      />
+      <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
+        <SellerErrorState
+          message={loadError ?? "Could not load your orders."}
+          onRetry={() => void load()}
+        />
+      </Box>
     );
   }
 
   return (
-    <div>
+    <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
       <PageHeader
         title="Orders"
         subtitle="Orders that contain at least one of your products."
@@ -123,7 +132,7 @@ export default function SellerOrdersPage() {
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{ display: "block", mt: -2, mb: 3 }}
+        sx={{ display: "block", mt: -1, mb: 3 }}
       >
         Order totals are the complete customer order; only the listed items
         belong to you.
@@ -205,125 +214,284 @@ export default function SellerOrdersPage() {
           }
         />
       ) : (
-        <Stack spacing={2}>
-          {ordersPage.content.map((order) => {
-            const itemSummary =
-              order.items.length === 0
-                ? "No seller items in this record."
-                : order.items
-                    .slice(0, 2)
-                    .map(
-                      (item) =>
-                        `${item.productName || "Product"}${item.sku ? ` · ${item.sku}` : ""} × ${item.quantity ?? "—"}`,
-                    )
-                    .join("; ") +
-                  (order.items.length > 2
-                    ? `; +${order.items.length - 2} more`
-                    : "");
+        <Box>
+          {/* Mobile: cards (xs, sm) */}
+          <Box component="section" sx={{ display: { xs: "block", md: "none" } }}>
+            <Stack spacing={2}>
+              {ordersPage.content.map((order) => {
+                const itemSummary =
+                  order.items.length === 0
+                    ? "No seller items in this record."
+                    : order.items
+                        .slice(0, 2)
+                        .map(
+                          (item) =>
+                            `${item.productName || "Product"}${item.sku ? ` · ${item.sku}` : ""} × ${item.quantity ?? "—"}`,
+                        )
+                        .join("; ") +
+                      (order.items.length > 2
+                        ? `; +${order.items.length - 2} more`
+                        : "");
 
-            return (
-              <Card key={order.id}>
-                <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1}
-                    sx={{
-                      justifyContent: "space-between",
-                      alignItems: { xs: "flex-start", sm: "center" },
-                      mb: 1,
-                    }}
-                  >
-                    <Typography
-                      variant="h6"
-                      sx={{
-                        fontWeight: 700,
-                        minWidth: 0,
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      Order {order.orderNumber}
-                    </Typography>
-                    <StatusChip status={order.status} />
-                  </Stack>
+                return (
+                  <Card key={order.id} sx={{ borderRadius: 3 }}>
+                    <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{
+                          justifyContent: "space-between",
+                          alignItems: { xs: "flex-start", sm: "center" },
+                          mb: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="h6"
+                          sx={{
+                            fontWeight: 700,
+                            minWidth: 0,
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          Order {order.orderNumber}
+                        </Typography>
+                        <StatusChip status={order.status} />
+                      </Stack>
 
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Placed {formatDateTime(order.createdAt)} · {order.items.length}{" "}
-                    seller item{order.items.length === 1 ? "" : "s"}
-                  </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 1 }}
+                      >
+                        Placed {formatDateTime(order.createdAt)} · {order.items.length}{" "}
+                        seller item{order.items.length === 1 ? "" : "s"}
+                      </Typography>
 
+                      <Typography
+                        variant="body2"
+                        sx={{ mb: 1.5, overflowWrap: "anywhere" }}
+                      >
+                        {itemSummary}
+                      </Typography>
+
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1.5}
+                        sx={{ alignItems: { xs: "stretch", sm: "center" } }}
+                      >
+                        <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                          {formatAmount(order.totalAmount)}
+                          {order.currency ? ` ${order.currency}` : ""}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ flexGrow: 1 }}
+                        >
+                          Complete order total
+                        </Typography>
+                        <Button
+                          component={Link}
+                          href={`/seller/orders/${order.id}`}
+                          variant="outlined"
+                          aria-label={`View details for order ${order.orderNumber}`}
+                          sx={{ minHeight: 44 }}
+                        >
+                          View details
+                        </Button>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Stack>
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              sx={{
+                alignItems: { xs: "stretch", sm: "center" },
+                mt: 3,
+              }}
+            >
+              <Button
+                variant="outlined"
+                disabled={page <= 0 || ordersPage.first}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+                sx={{ minHeight: 44 }}
+              >
+                Previous
+              </Button>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                role="status"
+                sx={{ flexGrow: 1, textAlign: "center" }}
+              >
+                Page {ordersPage.number + 1} of{" "}
+                {Math.max(ordersPage.totalPages, 1)} ·{" "}
+                {ordersPage.totalElements} order
+                {ordersPage.totalElements === 1 ? "" : "s"}
+              </Typography>
+              <Button
+                variant="outlined"
+                disabled={ordersPage.last}
+                onClick={() => setPage((current) => current + 1)}
+                sx={{ minHeight: 44 }}
+              >
+                Next
+              </Button>
+            </Stack>
+          </Box>
+
+          {/* Desktop: table (md+) */}
+          <Box component="section" sx={{ display: { xs: "none", sm: "none", md: "block" } }}>
+            <Card sx={{ borderRadius: 3, overflow: "hidden" }}>
+              <CardContent sx={{ p: 0 }}>
+                <TableContainer>
+                  <Table sx={{ minWidth: 700 }} aria-label="Seller orders">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Order</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Placed</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Your Items</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          Total
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>
+                          Action
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {ordersPage.content.map((order) => {
+                        const itemSummary =
+                          order.items.length === 0
+                            ? "No seller items"
+                            : order.items
+                                .slice(0, 2)
+                                .map(
+                                  (item) =>
+                                    `${item.productName || "Product"} × ${
+                                      item.quantity ?? "—"
+                                    }`,
+                                )
+                                .join("; ") +
+                              (order.items.length > 2
+                                ? `; +${order.items.length - 2} more`
+                                : "");
+
+                        return (
+                          <TableRow
+                            key={order.id}
+                            hover
+                            sx={{ "&:hover": { bgcolor: "action.hover" } }}
+                          >
+                            <TableCell>
+                              <Typography
+                                sx={{
+                                  fontWeight: 700,
+                                  overflowWrap: "anywhere",
+                                  minWidth: 0,
+                                }}
+                              >
+                                Order {order.orderNumber}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                ID: {order.id}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <StatusChip status={order.status} />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {formatDateTime(order.createdAt)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ overflowWrap: "anywhere", minWidth: 0 }}>
+                              <Typography variant="body2">
+                                {itemSummary}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                                {formatAmount(order.totalAmount)}
+                                {order.currency ? ` ${order.currency}` : ""}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                Complete order total
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Button
+                                component={Link}
+                                href={`/seller/orders/${order.id}`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ minHeight: 44 }}
+                              >
+                                View details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mt: 2,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <Typography
                     variant="body2"
-                    sx={{ mb: 1.5, overflowWrap: "anywhere" }}
+                    color="text.secondary"
+                    role="status"
                   >
-                    {itemSummary}
+                    Page {ordersPage.number + 1} of{" "}
+                    {Math.max(ordersPage.totalPages, 1)} ·{" "}
+                    {ordersPage.totalElements} order
+                    {ordersPage.totalElements === 1 ? "" : "s"}
                   </Typography>
-
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={1.5}
-                    sx={{ alignItems: { xs: "stretch", sm: "center" } }}
-                  >
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                      {formatAmount(order.totalAmount)}
-                      {order.currency ? ` ${order.currency}` : ""}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ flexGrow: 1 }}
-                    >
-                      Complete order total
-                    </Typography>
+                  <Box sx={{ display: "flex", gap: 1 }}>
                     <Button
-                      component={Link}
-                      href={`/seller/orders/${order.id}`}
                       variant="outlined"
-                      aria-label={`View details for order ${order.orderNumber}`}
+                      disabled={page <= 0 || ordersPage.first}
+                      onClick={() => setPage((current) => Math.max(0, current - 1))}
                       sx={{ minHeight: 44 }}
                     >
-                      View details
+                      Previous
                     </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            );
-          })}
-
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            sx={{ alignItems: { xs: "stretch", sm: "center" } }}
-          >
-            <Button
-              variant="outlined"
-              disabled={page <= 0 || ordersPage.first}
-              onClick={() => setPage((current) => Math.max(0, current - 1))}
-              sx={{ minHeight: 44 }}
-            >
-              Previous
-            </Button>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              role="status"
-              sx={{ flexGrow: 1, textAlign: "center" }}
-            >
-              Page {ordersPage.number + 1} of{" "}
-              {Math.max(ordersPage.totalPages, 1)} ·{" "}
-              {ordersPage.totalElements} order
-              {ordersPage.totalElements === 1 ? "" : "s"}
-            </Typography>
-            <Button
-              variant="outlined"
-              disabled={ordersPage.last}
-              onClick={() => setPage((current) => current + 1)}
-              sx={{ minHeight: 44 }}
-            >
-              Next
-            </Button>
-          </Stack>
-        </Stack>
+                    <Button
+                      variant="outlined"
+                      disabled={ordersPage.last}
+                      onClick={() => setPage((current) => current + 1)}
+                      sx={{ minHeight: 44 }}
+                    >
+                      Next
+                    </Button>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
