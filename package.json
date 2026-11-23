@@ -26,7 +26,9 @@
     "react-dom": "^19.3.0",
     "sharp": "^0.35.5",
     "source-map-js": "^1.2.2",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/core": "^7.6.10"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
