@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Skeleton, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 
 import { resolveProductImage } from "@/utils/productImages";
 import { formatPrice } from "@/utils/formatPrice";
@@ -69,7 +70,20 @@ export default function OrderItem({
               }}
             />
           ) : (
-            <Skeleton variant="rectangular" width="100%" height="100%" />
+            <Box
+              role="img"
+              aria-label="Product image unavailable"
+              sx={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "text.disabled",
+              }}
+            >
+              <Inventory2OutlinedIcon fontSize="small" />
+            </Box>
           )}
         </Box>
       )}
