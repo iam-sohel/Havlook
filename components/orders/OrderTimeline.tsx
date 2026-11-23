@@ -64,7 +64,6 @@ export default function OrderTimeline({ status, compact = false }: OrderTimeline
             {STEPS.map((step, index) => {
               const isDone = current > index;
               const isActive = current === index;
-              const isPending = current < index;
 
               return (
                 <Box
@@ -137,7 +136,7 @@ export default function OrderTimeline({ status, compact = false }: OrderTimeline
                       sx={{
                         height: 1,
                         flexGrow: 1,
-                        bgColor: isDone ? "success.main" : "divider",
+                        bgcolor: isDone ? "success.main" : "divider",
                       }}
                     />
                   )}
