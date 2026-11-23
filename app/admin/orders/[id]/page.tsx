@@ -129,7 +129,12 @@ export default function AdminOrderDetailsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void loadOrder(() => !cancelled);
+
+    void Promise.resolve().then(() => {
+      if (!cancelled) {
+        void loadOrder(() => !cancelled);
+      }
+    });
 
     return () => {
       cancelled = true;
