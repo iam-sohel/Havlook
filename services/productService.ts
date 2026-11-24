@@ -8,7 +8,7 @@
  */
 
 import { apiRequest, type ApiResult } from "@/lib/api";
-import { fetchAllPages } from "@/services/pagination";
+import { dedupeProductsById, fetchAllPages } from "@/services/pagination";
 
 import type {
   Product,
@@ -677,9 +677,7 @@ async function fetchAllProductSummaryPages(
     })
     .filter((product): product is Product => product !== null);
 
-  const uniqueProducts = Array.from(
-    new Map(products.map((product) => [String(product.id), product])).values(),
-  );
+  const uniqueProducts = dedupeProductsById(products);
 
   return {
     ok: true,
