@@ -174,6 +174,12 @@ export default async function CategoryPage(props: PageProps) {
           </Typography>
         </Box>
 
+        {firstRequestError && enrichedProducts.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Some products could not be loaded: {firstRequestError}
+          </Alert>
+        )}
+
         {enrichedProducts.length > 0 ? (
           <ClientProductGrid products={enrichedProducts} />
         ) : (
