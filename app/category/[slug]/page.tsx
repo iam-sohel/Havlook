@@ -154,10 +154,10 @@ export default async function CategoryPage(props: PageProps) {
     );
   }
 
-  // Limit detail requests to avoid overwhelming the backend.
-  const enrichedProducts = await enrichProductListWithDetails(
-    productSummaries.slice(0, 40),
-  );
+  // Enrichment runs in sequential batches of three requests. Keep every
+  // catalogue item visible without creating an unbounded request fan-out.
+  const enrichedProducts =
+    await enrichProductListWithDetails(productSummaries);
 
   return (
     <>
