@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { fetchAllPages } from "../services/pagination.js";
+import { dedupeProductsById, fetchAllPages } from "../services/pagination.js";
 
 test("fetches every page reported by the backend", async () => {
   const requested = [];
@@ -88,4 +88,17 @@ test("returns an empty result for an empty catalogue", async () => {
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.items, []);
+});
+
+test("deduplicates products by backend ID while preserving the latest item", () => {
+  const products = dedupeProductsById([
+    { id: 1, name: "first" },
+    { id: "2", name: "second" },
+    { id: "1", name: "updated" },
+  ]);
+
+  assert.deepEqual(products, [
+    { id: "1", name: "updated" },
+    { id: "2", name: "second" },
+  ]);
 });
