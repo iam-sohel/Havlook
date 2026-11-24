@@ -133,7 +133,7 @@ export default function Navbar() {
     "& .MuiOutlinedInput-root": {
       color: "text.primary",
       "& fieldset": {
-        borderColor: "transparent",
+        borderColor: "grey.400",
       },
       "&:hover": {
         bgcolor: "grey.200",

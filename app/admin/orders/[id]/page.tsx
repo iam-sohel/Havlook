@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+
 import {
   Alert,
-  Box,
   Breadcrumbs,
+  Box,
   Button,
   Chip,
   CircularProgress,
-  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -17,20 +17,13 @@ import {
   Paper,
   Select,
   SelectChangeEvent,
-  Skeleton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Typography,
 } from "@mui/material";
 
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import HomeIcon from "@mui/icons-material/Home";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import { useParams, useRouter } from "next/navigation";
 
 import {
@@ -39,9 +32,12 @@ import {
   type AdminOrder,
 } from "@/services/adminOrderService";
 
-import {
-  AdminErrorState,
-} from "@/components/admin/AdminStates";
+import { AdminErrorState } from "@/components/admin/AdminStates";
+import { OrderLoadingState } from "@/components/orders/OrderStates";
+import OrderStatusChip from "@/components/orders/OrderStatusChip";
+import OrderItem from "@/components/orders/OrderItem";
+import OrderTimeline from "@/components/orders/OrderTimeline";
+import PriceBreakdown from "@/components/orders/PriceBreakdown";
 
 const ORDER_STATUSES = [
   "PENDING",
@@ -53,21 +49,6 @@ const ORDER_STATUSES = [
   "RETURNED",
   "REFUNDED",
 ];
-
-function formatCurrency(
-  amount: number,
-  currency: string
-) {
-  try {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: currency || "INR",
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency || "INR"} ${amount.toFixed(2)}`;
-  }
-}
 
 function formatDate(value: string) {
   if (!value) return "—";
@@ -84,107 +65,20 @@ function formatDate(value: string) {
   });
 }
 
-function getStatusColor(
-  status: string
-):
-  | "default"
-  | "primary"
-  | "secondary"
-  | "success"
-  | "error"
-  | "warning"
-  | "info" {
-  switch (status.toUpperCase()) {
-    case "DELIVERED":
-      return "success";
-
-    case "CANCELLED":
-    case "REFUNDED":
-      return "error";
-
-    case "SHIPPED":
-      return "info";
-
-    case "PROCESSING":
-    case "CONFIRMED":
-      return "primary";
-
-    case "PENDING":
-      return "warning";
-
-    case "RETURNED":
-      return "secondary";
-
-    default:
-      return "default";
-  }
-}
-
-function getPaymentColor(
-  status: string
-):
-  | "default"
-  | "primary"
-  | "secondary"
-  | "success"
-  | "error"
-  | "warning"
-  | "info" {
+function getPaymentColor(status: string) {
   switch (status.toUpperCase()) {
     case "PAID":
       return "success";
-
     case "FAILED":
     case "CANCELLED":
       return "error";
-
     case "PENDING":
       return "warning";
-
     case "REFUNDED":
       return "info";
-
     default:
       return "default";
   }
-}
-
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 2,
-        py: 1,
-      }}
-    >
-      <Typography
-        variant="body2"
-        color="text.secondary"
-      >
-        {label}
-      </Typography>
-
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 600,
-          textAlign: "right",
-          wordBreak: "break-word",
-          minWidth: 0,
-        }}
-      >
-        {value || "—"}
-      </Typography>
-    </Box>
-  );
 }
 
 export default function AdminOrderDetailsPage() {
@@ -193,67 +87,66 @@ export default function AdminOrderDetailsPage() {
 
   const orderId = Number(params.id);
 
-  const [order, setOrder] =
-    useState<AdminOrder | null>(null);
-
+  const [order, setOrder] = useState<AdminOrder | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] =
-    useState(false);
-
+  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
-  const loadOrder = useCallback(async () => {
+  const loadOrder = useCallback(async (isActive: () => boolean = () => true) => {
     if (!orderId || Number.isNaN(orderId)) {
-      setError("Invalid order ID.");
-      setLoading(false);
+      if (isActive()) {
+        setError("Invalid order ID.");
+        setLoading(false);
+      }
       return;
     }
 
     try {
-      setLoading(true);
-      setError("");
+      if (isActive()) {
+        setLoading(true);
+        setError("");
+      }
 
-      const result =
-        await getAdminOrder(orderId);
+      const result = await getAdminOrder(orderId);
 
-      setOrder(result);
+      if (isActive()) {
+        setOrder(result);
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load order details."
-      );
+      if (isActive()) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load order details.",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (isActive()) {
+        setLoading(false);
+      }
     }
   }, [orderId]);
 
   useEffect(() => {
     let cancelled = false;
 
-    const run = async () => {
-      if (cancelled) return;
-      await loadOrder();
-    };
-
-    void run();
+    void Promise.resolve().then(() => {
+      if (!cancelled) {
+        void loadOrder(() => !cancelled);
+      }
+    });
 
     return () => {
       cancelled = true;
     };
   }, [loadOrder]);
 
-  const handleStatusChange = async (
-    event: SelectChangeEvent
-  ) => {
+  const handleStatusChange = async (event: SelectChangeEvent) => {
     if (!order) return;
 
     const newStatus = event.target.value;
 
-    if (
-      !newStatus ||
-      newStatus === order.status
-    ) {
+    if (!newStatus || newStatus === order.status) {
       return;
     }
 
@@ -261,18 +154,14 @@ export default function AdminOrderDetailsPage() {
       setUpdating(true);
       setError("");
 
-      const updatedOrder =
-        await updateAdminOrderStatus(
-          order.id,
-          newStatus
-        );
+      const updatedOrder = await updateAdminOrderStatus(order.id, newStatus);
 
       setOrder(updatedOrder);
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to update order status."
+          : "Unable to update order status.",
       );
     } finally {
       setUpdating(false);
@@ -281,62 +170,33 @@ export default function AdminOrderDetailsPage() {
 
   if (loading) {
     return (
-      <Box sx={{ p: { xs: 2, md: 3 } }}>
-        <Skeleton
-          variant="text"
-          width={280}
-          height={24}
-          sx={{ mb: 2 }}
-        />
-        <Skeleton
-          variant="text"
-          width={220}
-          height={44}
-          sx={{ mb: 2 }}
-        />
-        <Skeleton
-          variant="rounded"
-          height={320}
-          sx={{ borderRadius: 2, mb: 2 }}
-        />
-        <Skeleton
-          variant="rounded"
-          height={200}
-          sx={{ borderRadius: 2 }}
-        />
+      <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
+        <OrderLoadingState cards={3} />
       </Box>
     );
   }
 
   if (error && !order) {
     return (
-      <Box sx={{ p: { xs: 2, md: 3 } }}>
-        <Box sx={{ mb: 2 }}>
-          <AdminErrorState
-            message={error}
-            onRetry={() => void loadOrder()}
-          />
+      <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
+        <AdminErrorState message={error} onRetry={() => void loadOrder()} />
+        <Box sx={{ mt: 2 }}>
+          <Button
+            startIcon={<ArrowBackIcon />}
+            onClick={() => router.push("/admin/orders")}
+            sx={{ minHeight: 44 }}
+          >
+            Back to Orders
+          </Button>
         </Box>
-
-        <Button
-          startIcon={<ArrowBackIcon />}
-          onClick={() =>
-            router.push("/admin/orders")
-          }
-          sx={{ minHeight: 44 }}
-        >
-          Back to Orders
-        </Button>
       </Box>
     );
   }
 
   if (!order) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="warning">
-          Order not found.
-        </Alert>
+      <Box sx={{ px: 3 }}>
+        <Alert severity="warning">Order not found.</Alert>
       </Box>
     );
   }
@@ -353,31 +213,19 @@ export default function AdminOrderDetailsPage() {
     .join(", ");
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
       <Breadcrumbs
         sx={{
           mb: 2,
-          "& .MuiBreadcrumbs-ol": {
-            flexWrap: "wrap",
-            rowGap: 0.5,
-          },
+          "& .MuiBreadcrumbs-ol": { flexWrap: "wrap", rowGap: 0.5 },
         }}
       >
         <MuiLink
           component="button"
           underline="hover"
           color="inherit"
-          onClick={() =>
-            router.push("/admin")
-          }
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            border: 0,
-            background: "transparent",
-            cursor: "pointer",
-          }}
+          onClick={() => router.push("/admin")}
+          sx={{ border: 0, background: "transparent", cursor: "pointer" }}
         >
           <HomeIcon fontSize="small" />
           Admin
@@ -387,30 +235,19 @@ export default function AdminOrderDetailsPage() {
           component="button"
           underline="hover"
           color="inherit"
-          onClick={() =>
-            router.push("/admin/orders")
-          }
-          sx={{
-            border: 0,
-            background: "transparent",
-            cursor: "pointer",
-          }}
+          onClick={() => router.push("/admin/orders")}
+          sx={{ border: 0, background: "transparent", cursor: "pointer" }}
         >
           Orders
         </MuiLink>
 
         <Typography color="text.primary" sx={{ overflowWrap: "anywhere" }}>
-          {order.orderNumber ||
-            `#${order.id}`}
+          {order.orderNumber || `#${order.id}`}
         </Typography>
       </Breadcrumbs>
 
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setError("")}
-        >
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
@@ -419,49 +256,26 @@ export default function AdminOrderDetailsPage() {
         sx={{
           mb: 3,
           display: "flex",
-          flexDirection: {
-            xs: "column",
-            md: "row",
-          },
+          flexDirection: { xs: "column", md: "row" },
           justifyContent: "space-between",
-          alignItems: {
-            xs: "flex-start",
-            md: "center",
-          },
+          alignItems: { xs: "flex-start", md: "center" },
           gap: 2,
         }}
       >
         <Box>
           <Typography
             variant="h4"
-            sx={{
-              fontWeight: 700,
-              overflowWrap: "anywhere",
-              minWidth: 0,
-            }}
+            sx={{ fontWeight: 700, overflowWrap: "anywhere", minWidth: 0 }}
           >
-            Order{" "}
-            {order.orderNumber ||
-              `#${order.id}`}
+            Order {order.orderNumber || `#${order.id}`}
           </Typography>
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            Created{" "}
-            {formatDate(order.createdAt)}
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Created {formatDate(order.createdAt)}
           </Typography>
         </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            gap: 1,
-            flexWrap: "wrap",
-          }}
-        >
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
@@ -475,9 +289,7 @@ export default function AdminOrderDetailsPage() {
           <Button
             variant="outlined"
             startIcon={<ArrowBackIcon />}
-            onClick={() =>
-              router.push("/admin/orders")
-            }
+            onClick={() => router.push("/admin/orders")}
             sx={{ minHeight: 44 }}
           >
             Back to Orders
@@ -485,10 +297,7 @@ export default function AdminOrderDetailsPage() {
         </Box>
       </Box>
 
-      <Grid
-        container
-        spacing={2}
-      >
+      <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 8 }}>
           <Stack spacing={2}>
             <Paper
@@ -497,165 +306,56 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent:
-                    "space-between",
+                  justifyContent: "space-between",
                   alignItems: "center",
                   gap: 2,
                   mb: 2,
                   flexWrap: "wrap",
                 }}
               >
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 700 }}
-                >
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Order Items
                 </Typography>
-
-                <Chip
-                  label={
-                    order.status ||
-                    "UNKNOWN"
-                  }
-                  color={getStatusColor(
-                    order.status
-                  )}
-                />
+                <OrderStatusChip status={order.status} />
               </Box>
 
-              <TableContainer sx={{ overflowX: "auto" }}>
-                <Table
-                  sx={{ minWidth: 640 }}
-                  aria-label="Order items"
-                >
-                <TableHead>
-                  <TableRow>
-                    <TableCell
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Product
-                    </TableCell>
+              <OrderTimeline status={order.status} />
 
-                    <TableCell
-                      sx={{ fontWeight: 700 }}
-                    >
-                      SKU
-                    </TableCell>
-
-                    <TableCell
-                      align="center"
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Qty
-                    </TableCell>
-
-                    <TableCell
-                      align="right"
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Price
-                    </TableCell>
-
-                    <TableCell
-                      align="right"
-                      sx={{ fontWeight: 700 }}
-                    >
-                      Total
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-
-                <TableBody>
-                  {order.items.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                      >
-                        <Typography
-                          color="text.secondary"
-                          sx={{
-                            py: 3,
-                            textAlign: "center",
-                          }}
-                        >
-                          No items found for
-                          this order.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    order.items.map(
-                      (item) => (
-                        <TableRow
-                          key={item.id}
-                        >
-                          <TableCell>
-                            <Typography
-                              sx={{
-                                fontWeight: 600,
-                                overflowWrap: "anywhere",
-                              }}
-                            >
-                              {item.productName ||
-                                "Unknown Product"}
-                            </Typography>
-
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{
-                                display: "block",
-                                overflowWrap: "anywhere",
-                              }}
-                            >
-                              Variant ID:{" "}
-                              {
-                                item.productVariantId
-                              }
-                            </Typography>
-                          </TableCell>
-
-                          <TableCell sx={{ overflowWrap: "anywhere" }}>
-                            {item.sku ||
-                              "—"}
-                          </TableCell>
-
-                          <TableCell align="center">
-                            {item.quantity}
-                          </TableCell>
-
-                          <TableCell align="right">
-                            {formatCurrency(
-                              item.unitSellingPrice,
-                              order.currency
-                            )}
-                          </TableCell>
-
-                          <TableCell align="right">
-                            <Typography
-                              sx={{
-                                fontWeight: 700,
-                              }}
-                            >
-                              {formatCurrency(
-                                item.lineTotal,
-                                order.currency
-                              )}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    )
-                  )}
-                </TableBody>
-                </Table>
-              </TableContainer>
+              <Box sx={{ mt: 2 }}>
+                {order.items.length === 0 ? (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ textAlign: "center", py: 3 }}
+                  >
+                    No items found for this order.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.5}>
+                    {order.items.map((item) => (
+                      <OrderItem
+                        key={item.id}
+                        item={{
+                          productName: item.productName,
+                          sku: item.sku,
+                          quantity: item.quantity,
+                          unitSellingPrice: item.unitSellingPrice,
+                          lineTotal: item.lineTotal,
+                          status: order.status,
+                        }}
+                        showThumbnail
+                        showStatus
+                      />
+                    ))}
+                  </Stack>
+                )}
+              </Box>
             </Paper>
 
             <Paper
@@ -664,69 +364,34 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  mb: 2,
-                }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                 Shipping Information
               </Typography>
 
-              <Grid
-                container
-                spacing={2}
-              >
+              <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Recipient
                   </Typography>
-
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      mt: 0.5,
-                    }}
-                  >
-                    {order.shippingFullName ||
-                      "—"}
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {order.shippingFullName || "—"}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Phone
                   </Typography>
-
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      mt: 0.5,
-                    }}
-                  >
-                    {order.shippingPhoneNumber ||
-                      "—"}
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {order.shippingPhoneNumber || "—"}
                   </Typography>
                 </Grid>
-
                 <Grid size={12}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Address
                   </Typography>
-
                   <Typography
                     sx={{
                       fontWeight: 600,
@@ -734,8 +399,7 @@ export default function AdminOrderDetailsPage() {
                       overflowWrap: "anywhere",
                     }}
                   >
-                    {shippingAddress ||
-                      "—"}
+                    {shippingAddress || "—"}
                   </Typography>
                 </Grid>
               </Grid>
@@ -747,82 +411,40 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  mb: 2,
-                }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                 Payment Information
               </Typography>
 
-              <Grid
-                container
-                spacing={2}
-              >
+              <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Payment Method
                   </Typography>
-
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      mt: 0.5,
-                    }}
-                  >
-                    {order.paymentMethod ||
-                      "—"}
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {order.paymentMethod || "—"}
                   </Typography>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Payment Status
                   </Typography>
-
                   <Box sx={{ mt: 0.5 }}>
                     <Chip
                       size="small"
-                      label={
-                        order.paymentStatus ||
-                        "UNKNOWN"
-                      }
-                      color={getPaymentColor(
-                        order.paymentStatus
-                      )}
+                      label={order.paymentStatus || "UNKNOWN"}
+                      color={getPaymentColor(order.paymentStatus)}
                     />
                   </Box>
                 </Grid>
-
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
+                  <Typography variant="body2" color="text.secondary">
                     Payment Expires
                   </Typography>
-
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      mt: 0.5,
-                    }}
-                  >
-                    {formatDate(
-                      order.paymentExpiresAt ||
-                        ""
-                    )}
+                  <Typography sx={{ fontWeight: 600, mt: 0.5 }}>
+                    {formatDate(order.paymentExpiresAt || "")}
                   </Typography>
                 </Grid>
               </Grid>
@@ -830,9 +452,7 @@ export default function AdminOrderDetailsPage() {
           </Stack>
         </Grid>
 
-        <Grid
-          size={{ xs: 12, md: 4 }}
-        >
+        <Grid size={{ xs: 12, md: 4 }}>
           <Stack spacing={2}>
             <Paper
               elevation={0}
@@ -840,16 +460,10 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  mb: 2,
-                }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                 Order Status
               </Typography>
 
@@ -863,25 +477,14 @@ export default function AdminOrderDetailsPage() {
                   value={order.status}
                   label="Status"
                   disabled={updating}
-                  onChange={
-                    handleStatusChange
-                  }
-                  sx={{
-                    "&.MuiOutlinedInput-root": {
-                      minHeight: 44,
-                    },
-                  }}
+                  onChange={handleStatusChange}
+                  sx={{ "&.MuiOutlinedInput-root": { minHeight: 44 } }}
                 >
-                  {ORDER_STATUSES.map(
-                    (status) => (
-                      <MenuItem
-                        key={status}
-                        value={status}
-                      >
-                        {status}
-                      </MenuItem>
-                    )
-                  )}
+                  {ORDER_STATUSES.map((status) => (
+                    <MenuItem key={status} value={status}>
+                      {status}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
 
@@ -894,15 +497,9 @@ export default function AdminOrderDetailsPage() {
                     mt: 2,
                   }}
                 >
-                  <CircularProgress
-                    size={18}
-                  />
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Updating order status...
+                  <CircularProgress size={18} />
+                  <Typography variant="body2" color="text.secondary">
+                    Updating order status…
                   </Typography>
                 </Box>
               )}
@@ -914,59 +511,20 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  mb: 1,
-                }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                 Price Summary
               </Typography>
 
-              <InfoRow
-                label="Subtotal"
-                value={formatCurrency(
-                  order.subtotal,
-                  order.currency
-                )}
-              />
-
-              <InfoRow
-                label="Discount"
-                value={`- ${formatCurrency(
-                  order.discountAmount,
-                  order.currency
-                )}`}
-              />
-
-              <InfoRow
-                label="Shipping"
-                value={formatCurrency(
-                  order.shippingCharge,
-                  order.currency
-                )}
-              />
-
-              <InfoRow
-                label="Tax"
-                value={formatCurrency(
-                  order.taxAmount,
-                  order.currency
-                )}
-              />
-
-              <Divider sx={{ my: 1 }} />
-
-              <InfoRow
-                label="Total"
-                value={formatCurrency(
-                  order.totalAmount,
-                  order.currency
-                )}
+              <PriceBreakdown
+                subtotal={order.subtotal}
+                discountAmount={order.discountAmount}
+                shippingCharge={order.shippingCharge}
+                taxAmount={order.taxAmount}
+                totalAmount={order.totalAmount}
+                currency={order.currency}
               />
             </Paper>
 
@@ -976,32 +534,55 @@ export default function AdminOrderDetailsPage() {
                 p: 2.5,
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             >
-              <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: 700,
-                  mb: 1,
-                }}
-              >
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
                 Order Timeline
               </Typography>
 
-              <InfoRow
-                label="Created"
-                value={formatDate(
-                  order.createdAt
-                )}
-              />
-
-              <InfoRow
-                label="Last Updated"
-                value={formatDate(
-                  order.updatedAt
-                )}
-              />
+              <Stack spacing={1}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    py: 1,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Created
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, textAlign: "right", minWidth: 0 }}
+                  >
+                    {formatDate(order.createdAt)}
+                  </Typography>
+                </Box>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 2,
+                    py: 1,
+                    borderBottom: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Last Updated
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, textAlign: "right", minWidth: 0 }}
+                  >
+                    {formatDate(order.updatedAt)}
+                  </Typography>
+                </Box>
+              </Stack>
             </Paper>
           </Stack>
         </Grid>
