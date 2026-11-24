@@ -5,6 +5,7 @@ import { Grid } from "@mui/material";
 
 import ProductCard from "./ProductCard";
 import { getProductDetailsById } from "@/services/productService";
+import { createBoundedAsyncCache } from "@/services/boundedAsyncCache";
 import { getProductImage } from "@/utils/productImages";
 import type { Product } from "@/types/product";
 
@@ -18,25 +19,24 @@ interface PendingDetailsRequest {
 }
 
 const MAX_DETAIL_REQUESTS = 3;
+const MAX_CACHED_DETAILS = 200;
 const pendingDetails: PendingDetailsRequest[] = [];
-const detailPromises = new Map<string, Promise<Product | null>>();
+const detailCache = createBoundedAsyncCache<Product>(MAX_CACHED_DETAILS);
 let activeDetailRequests = 0;
 
 /**
- * A module-level queue keeps detail requests bounded across every visible
- * product card, even when multiple grids are mounted on the same page.
+ * Keep detail requests bounded across grids. Successful details use a bounded
+ * LRU cache; failed/null results are evicted so a later mount can retry.
  */
 function loadProductDetails(id: string): Promise<Product | null> {
-  const existing = detailPromises.get(id);
-  if (existing) return existing;
-
-  const request = new Promise<Product | null>((resolve) => {
-    pendingDetails.push({ id, resolve });
-    processPendingDetails();
-  });
-
-  detailPromises.set(id, request);
-  return request;
+  return detailCache.getOrLoad(
+    id,
+    () =>
+      new Promise<Product | null>((resolve) => {
+        pendingDetails.push({ id, resolve });
+        processPendingDetails();
+      }),
+  );
 }
 
 function processPendingDetails(): void {
