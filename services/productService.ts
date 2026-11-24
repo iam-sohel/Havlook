@@ -8,6 +8,7 @@
  */
 
 import { apiRequest, type ApiResult } from "@/lib/api";
+import { fetchAllPages } from "@/services/pagination";
 
 import type {
   Product,
@@ -432,6 +433,13 @@ export async function enrichProductListWithDetails(
     i < products.length;
     i += ENRICH_CONCURRENCY
   ) {
+    if (signal?.aborted) {
+      for (let remaining = i; remaining < products.length; remaining += 1) {
+        out[remaining] = products[remaining];
+      }
+      break;
+    }
+
     const batch = products.slice(
       i,
       i + ENRICH_CONCURRENCY,
@@ -614,20 +622,80 @@ async function normalizeProductSummaryPage(
  * Response:
  * CommonResponseDto<Page<ProductResponse>>
  */
+async function fetchAllProductSummaryPages(
+  endpoint: string,
+  signal?: AbortSignal,
+): Promise<ApiResult<Product[]>> {
+  const pages = await fetchAllPages(
+    async (page, size) => {
+      const result =
+        await apiRequest<BackendProductSummaryPageResponse>(
+          `${endpoint}?page=${page}&size=${size}`,
+          {
+            method: "GET",
+            signal,
+          },
+        );
+
+      if (!result.ok) return result;
+
+      const payload = result.data?.data;
+      if (!payload || !Array.isArray(payload.content)) {
+        return {
+          ok: false as const,
+          status: 500,
+          message: "Product page payload is missing.",
+          errorCode: "PRODUCT_PAGE_INVALID_PAYLOAD",
+        };
+      }
+
+      return {
+        ok: true as const,
+        status: result.status,
+        data: {
+          content: payload.content,
+          totalElements:
+            payload.page?.totalElements ?? payload.totalElements,
+          totalPages:
+            payload.page?.totalPages ?? payload.totalPages,
+          size: payload.page?.size ?? payload.size,
+        },
+      };
+    },
+    { signal },
+  );
+
+  if (!pages.ok) return pages;
+
+  const products = pages.items
+    .map((dto) => {
+      try {
+        return normalizeBackendProduct(dto);
+      } catch {
+        return null;
+      }
+    })
+    .filter((product): product is Product => product !== null);
+
+  const uniqueProducts = Array.from(
+    new Map(products.map((product) => [String(product.id), product])).values(),
+  );
+
+  return {
+    ok: true,
+    status: pages.status,
+    data: uniqueProducts,
+  };
+}
+
 export async function getProductsByCategory(
   categoryId: string | number,
   signal?: AbortSignal,
 ): Promise<ApiResult<Product[]>> {
-  const result =
-    await apiRequest<BackendProductSummaryPageResponse>(
-      ENDPOINTS.categoryProducts(categoryId),
-      {
-        method: "GET",
-        signal,
-      },
-    );
-
-  return normalizeProductSummaryPage(result);
+  return fetchAllProductSummaryPages(
+    ENDPOINTS.categoryProducts(categoryId),
+    signal,
+  );
 }
 
 /**
@@ -869,61 +937,69 @@ export async function listProducts(
 ): Promise<ListProductsResult> {
   const { signal } = options;
 
-  const result =
-    await apiRequest<BackendProductPageResponse>(
-      ENDPOINTS.products,
-      {
-        method: "GET",
-        signal,
-      },
-    );
+  const pages = await fetchAllPages(
+    async (page, size) => {
+      const result =
+        await apiRequest<BackendProductPageResponse>(
+          `${ENDPOINTS.products}?page=${page}&size=${size}`,
+          {
+            method: "GET",
+            signal,
+          },
+        );
 
-  if (!result.ok) {
+      if (!result.ok) return result;
+
+      const payload = result.data?.data;
+      if (!payload || !Array.isArray(payload.content)) {
+        return {
+          ok: false as const,
+          status: 500,
+          message:
+            "Backend returned an unexpected product catalogue payload.",
+          errorCode: "PRODUCT_CATALOGUE_INVALID_PAYLOAD",
+        };
+      }
+
+      return {
+        ok: true as const,
+        status: result.status,
+        data: {
+          content: payload.content,
+          totalElements: payload.totalElements,
+          totalPages: payload.totalPages,
+          size: payload.size,
+        },
+      };
+    },
+    { signal },
+  );
+
+  if (!pages.ok) {
     return {
       source: "error",
-      message: result.message,
-      errorCode:
-        result.errorCode,
+      message: pages.message,
+      errorCode: pages.errorCode,
     };
   }
 
-  const page =
-    result.data?.data;
+  const products = pages.items
+    .map((dto) => {
+      try {
+        return normalizeBackendProductDetails(dto);
+      } catch {
+        return null;
+      }
+    })
+    .filter((product): product is Product => product !== null);
 
-  if (
-    !page ||
-    !Array.isArray(page.content)
-  ) {
-    return {
-      source: "error",
-      message:
-        "Backend returned an unexpected product catalogue payload.",
-      errorCode:
-        "PRODUCT_CATALOGUE_INVALID_PAYLOAD",
-    };
-  }
-
-  const products =
-    page.content
-      .map((dto) => {
-        try {
-          return normalizeBackendProductDetails(
-            dto,
-          );
-        } catch {
-          return null;
-        }
-      })
-      .filter(
-        (
-          product,
-        ): product is Product =>
-          product !== null,
-      );
+  const uniqueProducts = Array.from(
+    new Map(products.map((product) => [String(product.id), product])).values(),
+  );
 
   return {
     source: "backend",
-    products,
+    products: uniqueProducts,
   };
 }
 
