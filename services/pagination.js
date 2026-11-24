@@ -114,3 +114,14 @@ export async function fetchAllPages(
     errorCode: "PRODUCT_PAGINATION_LIMIT_EXCEEDED",
   };
 }
+
+/**
+ * @template {{ id: string | number }} T
+ * @param {T[]} products
+ * @returns {T[]}
+ */
+export function dedupeProductsById(products) {
+  return Array.from(
+    new Map(products.map((product) => [String(product.id), product])).values(),
+  );
+}
