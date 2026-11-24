@@ -17,7 +17,6 @@ import { listCategories } from "@/services/catalogService";
 
 import {
   getProductsByCategory,
-  enrichProductListWithDetails,
   type Product,
 } from "@/services/productService";
 
@@ -154,10 +153,9 @@ export default async function CategoryPage(props: PageProps) {
     );
   }
 
-  // Enrichment runs in sequential batches of three requests. Keep every
-  // catalogue item visible without creating an unbounded request fan-out.
-  const enrichedProducts =
-    await enrichProductListWithDetails(productSummaries);
+  // Product details are fetched lazily by the client grid as cards approach
+  // the viewport, with a shared three-request concurrency limit.
+  const visibleProducts = productSummaries;
 
   return (
     <>
@@ -174,14 +172,14 @@ export default async function CategoryPage(props: PageProps) {
           </Typography>
         </Box>
 
-        {firstRequestError && enrichedProducts.length > 0 && (
+        {firstRequestError && visibleProducts.length > 0 && (
           <Alert severity="warning" sx={{ mb: 3 }}>
             Some products could not be loaded: {firstRequestError}
           </Alert>
         )}
 
-        {enrichedProducts.length > 0 ? (
-          <ClientProductGrid products={enrichedProducts} />
+        {visibleProducts.length > 0 ? (
+          <ClientProductGrid products={visibleProducts} />
         ) : (
           <EmptyProducts />
         )}
