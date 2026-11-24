@@ -1,6 +1,9 @@
 /**
  * Bounded LRU cache for successful asynchronous lookups.
  * In-flight calls are deduplicated; null results and failures are retryable.
+ * @template T
+ * @param {number} [maxEntries]
+ * @returns {{ getOrLoad: (key: string, loader: () => Promise<T | null> | T | null) => Promise<T | null> }}
  */
 export function createBoundedAsyncCache(maxEntries = 200) {
   if (!Number.isInteger(maxEntries) || maxEntries < 1) {
