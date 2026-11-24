@@ -12,11 +12,6 @@ import {
   CardContent,
   Grid,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
 } from "@mui/material";
 
@@ -36,6 +31,9 @@ import {
   type SellerEarning,
 } from "@/services/sellerEarningService";
 import { formatAmount, formatDateTime } from "@/utils/formatAmount";
+import OrderStatusChip from "@/components/orders/OrderStatusChip";
+import OrderItem from "@/components/orders/OrderItem";
+import PriceBreakdown from "@/components/orders/PriceBreakdown";
 
 function InfoField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -138,20 +136,22 @@ export default function SellerOrderDetailPage() {
 
   if (loadError || !order) {
     return (
-      <Stack spacing={2}>
-        <Button
-          component={Link}
-          href="/seller/orders"
-          variant="text"
-          sx={{ alignSelf: "flex-start" }}
-        >
-          Back to orders
-        </Button>
-        <SellerErrorState
-          message={loadError ?? "Could not load this order."}
-          onRetry={() => void load()}
-        />
-      </Stack>
+      <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
+        <Stack spacing={2}>
+          <Button
+            component={Link}
+            href="/seller/orders"
+            variant="text"
+            sx={{ alignSelf: "flex-start", px: 0 }}
+          >
+            Back to orders
+          </Button>
+          <SellerErrorState
+            message={loadError ?? "Could not load this order."}
+            onRetry={() => void load()}
+          />
+        </Stack>
+      </Box>
     );
   }
 
@@ -167,7 +167,7 @@ export default function SellerOrderDetailPage() {
     .join(", ");
 
   return (
-    <div>
+    <Box sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
       <Button
         component={Link}
         href="/seller/orders"
@@ -179,10 +179,10 @@ export default function SellerOrderDetailPage() {
 
       <PageHeader
         title={`Order ${order.orderNumber}`}
-        subtitle={`Placed ${formatDateTime(order.createdAt)} · Payment ${
-          order.paymentStatus ? humanizeStatus(order.paymentStatus) : "—"
-        }`}
-        actions={<StatusChip status={order.status} />}
+        subtitle={
+          `Placed ${formatDateTime(order.createdAt)} · Payment ${order.paymentStatus ? humanizeStatus(order.paymentStatus) : "—"}`
+        }
+        actions={<OrderStatusChip status={order.status} size="medium" />}
       />
 
       <Stack spacing={3}>
@@ -192,10 +192,11 @@ export default function SellerOrderDetailPage() {
           order-status changes are not available in the current backend.
         </Alert>
 
+        {/* Your items */}
         <Card>
           <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 2.5 }}>
-              Your items
+              Your Items
             </Typography>
 
             {order.items.length === 0 ? (
@@ -203,68 +204,56 @@ export default function SellerOrderDetailPage() {
                 This order contains no items belonging to your account.
               </Typography>
             ) : (
-              <Box sx={{ width: "100%", overflowX: "auto" }}>
-                <Table aria-label="Seller order items" sx={{ minWidth: 680 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Product</TableCell>
-                      <TableCell>SKU</TableCell>
-                      <TableCell align="right">Quantity</TableCell>
-                      <TableCell align="right">Unit price</TableCell>
-                      <TableCell align="right">Line total</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {order.items.map((item, index) => (
-                      <TableRow key={item.id ?? `item-${index}` }>
-                        <TableCell>{item.productName || "Product"}</TableCell>
-                        <TableCell>{item.sku || "—"}</TableCell>
-                        <TableCell align="right">
-                          {item.quantity ?? "—"}
-                        </TableCell>
-                        <TableCell align="right">
-                          {formatAmount(item.unitSellingPrice)}
-                        </TableCell>
-                        <TableCell align="right">
-                          {formatAmount(item.lineTotal)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Box>
+              <Stack spacing={1.5}>
+                {order.items.map((item, index) => (
+                  <OrderItem
+                    key={item.id ?? `item-${index}`}
+                    item={{
+                      productName: item.productName,
+                      sku: item.sku,
+                      quantity: item.quantity,
+                      unitSellingPrice: item.unitSellingPrice,
+                      lineTotal: item.lineTotal,
+                      status: order.status,
+                    }}
+                    showThumbnail
+                    showStatus
+                  />
+                ))}
+              </Stack>
             )}
           </CardContent>
         </Card>
 
+        {/* Fulfilment and payment */}
         <Card>
           <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 2.5 }}>
-              Fulfilment and payment
+              Fulfilment and Payment
             </Typography>
 
             <Grid container spacing={3}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <InfoField label="Customer" value={order.shippingFullName || "—"} />
+                <InfoField
+                  label="Customer"
+                  value={order.shippingFullName || "—"}
+                />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <InfoField label="Phone" value={order.shippingPhoneNumber || "—"} />
               </Grid>
               <Grid size={{ xs: 12 }}>
-                <InfoField label="Delivery address" value={address || "—"} />
+                <InfoField label="Delivery Address" value={address || "—"} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <InfoField label="Payment Method" value={order.paymentMethod || "—"} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <InfoField
-                  label="Payment method"
-                  value={order.paymentMethod || "—"}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <InfoField
-                  label="Payment status"
+                  label="Payment Status"
                   value={
                     order.paymentStatus ? (
-                      <StatusChip status={order.paymentStatus} />
+                      <OrderStatusChip status={order.paymentStatus} />
                     ) : (
                       "—"
                     )
@@ -273,20 +262,45 @@ export default function SellerOrderDetailPage() {
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <InfoField
-                  label="Complete order total"
+                  label="Complete Order Total"
                   value={`${formatAmount(order.totalAmount)}${order.currency ? ` ${order.currency}` : ""}`}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <InfoField
-                  label="Updated"
-                  value={formatDateTime(order.updatedAt)}
-                />
+                <InfoField label="Updated" value={formatDateTime(order.updatedAt)} />
               </Grid>
             </Grid>
           </CardContent>
         </Card>
 
+        {/* Price summary */}
+        <Card>
+          <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+            <Typography variant="h5" sx={{ fontWeight: 700, mb: 2.5 }}>
+              Price Summary (Complete Order)
+            </Typography>
+
+            <PriceBreakdown
+              subtotal={order.subtotal ?? undefined}
+              discountAmount={order.discountAmount ?? undefined}
+              shippingCharge={order.shippingCharge ?? undefined}
+              taxAmount={order.taxAmount ?? undefined}
+              totalAmount={order.totalAmount ?? undefined}
+              currency={order.currency}
+              compact
+            />
+
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mt: 1 }}
+            >
+              This is the complete customer order total, not your earnings.
+            </Typography>
+          </CardContent>
+        </Card>
+
+        {/* Linked earnings */}
         <Card>
           <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
             <Stack
@@ -299,7 +313,7 @@ export default function SellerOrderDetailPage() {
               }}
             >
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                Linked earnings
+                Linked Earnings
               </Typography>
               <Button
                 component={Link}
@@ -366,6 +380,6 @@ export default function SellerOrderDetailPage() {
           </CardContent>
         </Card>
       </Stack>
-    </div>
+    </Box>
   );
 }

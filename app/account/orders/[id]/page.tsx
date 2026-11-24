@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
-  CircularProgress,
-  Divider,
+  Chip,
+  Grid,
   Stack,
   Typography,
 } from "@mui/material";
@@ -22,15 +24,12 @@ import {
   getOrderById,
   type OrderResponseWire,
 } from "@/services/orderService";
-
-function formatMoney(value?: string | number | null) {
-  const amount = Number(value ?? 0);
-
-  return `₹${amount.toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
+import { OrderLoadingState, OrderErrorState } from "@/components/orders/OrderStates";
+import OrderStatusChip from "@/components/orders/OrderStatusChip";
+import OrderItem from "@/components/orders/OrderItem";
+import OrderTimeline from "@/components/orders/OrderTimeline";
+import PriceBreakdown from "@/components/orders/PriceBreakdown";
+import ConfirmActionDialog from "@/components/admin/ConfirmActionDialog";
 
 function formatDate(value?: string | null) {
   if (!value) {
@@ -66,14 +65,13 @@ export default function OrderDetailsPage() {
   const params = useParams();
   const router = useRouter();
 
-  const { checking, authed } = useRequireAuth(
-    "/account/orders"
-  );
+  const { checking, authed } = useRequireAuth("/account/orders");
 
   const [order, setOrder] = useState<OrderResponseWire | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const idParam = Array.isArray(params?.id)
     ? params.id[0]
@@ -131,26 +129,14 @@ export default function OrderDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    checking,
-    authed,
-    invalidOrderId,
-    orderId,
-  ]);
+  }, [checking, authed, invalidOrderId, orderId]);
 
   async function handleCancelOrder() {
     if (!order) {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to cancel this order?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+    setConfirmOpen(false);
     setCancelling(true);
     setError("");
 
@@ -183,7 +169,7 @@ export default function OrderDetailsPage() {
 
   if (checking || (loading && !invalidOrderId)) {
     return (
-      <>
+      <Box>
         <Header />
 
         <Box
@@ -202,22 +188,18 @@ export default function OrderDetailsPage() {
               gap: 2,
             }}
           >
-            <CircularProgress />
-
-            <Typography color="text.secondary">
-              Loading order details...
-            </Typography>
+            <OrderLoadingState cards={1} />
           </Box>
         </Box>
 
         <Footer />
-      </>
+      </Box>
     );
   }
 
   if ((error || invalidOrderId) && !order) {
     return (
-      <>
+      <Box>
         <Header />
 
         <Box
@@ -228,30 +210,24 @@ export default function OrderDetailsPage() {
             py: 6,
           }}
         >
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {invalidOrderId
-              ? "Invalid order ID."
-              : error}
-          </Alert>
-
-          <Button
-            variant="contained"
-            onClick={() =>
-              router.push("/account/orders")
-            }
-          >
-            Back to My Orders
-          </Button>
+          <OrderErrorState
+            message={invalidOrderId ? "Invalid order ID." : error}
+            onRetry={() => {
+              setError("");
+              void window.location.reload();
+            }}
+            backLink={{ href: "/account/orders", label: "Back to My Orders" }}
+          />
         </Box>
 
         <Footer />
-      </>
+      </Box>
     );
   }
 
   if (!order) {
     return (
-      <>
+      <Box>
         <Header />
 
         <Box
@@ -268,12 +244,24 @@ export default function OrderDetailsPage() {
         </Box>
 
         <Footer />
-      </>
+      </Box>
     );
   }
 
+  const items = order.items || [];
+  const shippingAddress = [
+    order.shippingStreetAddress,
+    order.shippingLandmark,
+    order.shippingCity,
+    order.shippingState,
+    order.shippingPostalCode,
+    order.shippingCountry,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
-    <>
+    <Box>
       <Header />
 
       <Box
@@ -287,351 +275,266 @@ export default function OrderDetailsPage() {
         <Stack spacing={3}>
           <Box>
             <Button
-              onClick={() =>
-                router.push("/account/orders")
-              }
+              startIcon={<ArrowBackIcon />}
+              onClick={() => router.push("/account/orders")}
               sx={{ mb: 2 }}
+              size="small"
             >
-              ← Back to My Orders
+              Back to My Orders Back to My Orders
             </Button>
 
-            <Typography
-              variant="h4"
+            <Box
               sx={{
-                fontWeight: 700,
-                fontSize: {
-                  xs: "1.7rem",
-                  sm: "2.125rem",
-                },
+                display: "flex",
+                flexDirection: { xs: "column", sm: "row" },
+                justifyContent: "space-between",
+                alignItems: { xs: "flex-start", sm: "center" },
+                gap: 2,
+                flexWrap: "wrap",
               }}
             >
-              Order Details
-            </Typography>
-          </Box>
+              <Box>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    overflowWrap: "anywhere",
+                    minWidth: 0,
+                  }}
+                >
+                  Order {order.orderNumber || `#${order.id}`}
+                </Typography>
 
-          {error && (
-            <Alert severity="error">
-              {error}
-            </Alert>
-          )}
-
-          <Card>
-            <CardContent
-              sx={{
-                p: { xs: 2, md: 3 },
-              }}
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: {
-                    xs: "column",
-                    sm: "row",
-                  },
-                  justifyContent: "space-between",
-                  gap: 2,
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 700 }}
-                  >
-                    Order #{order.orderNumber}
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Placed on{" "}
-                    {formatDate(order.createdAt)}
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography
-                    sx={{
-                      fontWeight: 700,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {order.status || "Pending"}
-                  </Typography>
-                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Placed {formatDate(order.createdAt)}
+                </Typography>
               </Box>
 
-              {canCancel(order.status) && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  disabled={cancelling}
-                  onClick={handleCancelOrder}
-                  sx={{ mt: 3 }}
-                >
-                  {cancelling
-                    ? "Cancelling..."
-                    : "Cancel Order"}
-                </Button>
-              )}
+              <OrderStatusChip status={order.status} size="medium" />
+            </Box>
+          </Box>
+
+          {error && <Alert severity="error">{error}</Alert>}
+
+          {/* Order status timeline */}
+          <Card>
+            <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 700, mb: 2 }}
+              >
+                Order Progress
+              </Typography>
+              <OrderTimeline status={order.status} />
             </CardContent>
           </Card>
 
+          {/* Items */}
           <Card>
-            <CardContent
-              sx={{
-                p: { xs: 2, md: 3 },
-              }}
-            >
+            <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
               <Typography
                 variant="h6"
-                sx={{ fontWeight: 700 }}
-                gutterBottom
+                sx={{ fontWeight: 700, mb: 2 }}
               >
-                Items
+                Ordered Items
               </Typography>
 
-              <Stack
-                divider={<Divider />}
-                spacing={0}
-              >
-                {order.items?.map((item) => (
-                  <Box
+              <Stack spacing={1.5}>
+                {items.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No items found for this order.
+                  </Typography>
+                ) : items.map((item) => (
+                  <OrderItem
                     key={item.id}
-                    sx={{
-                      py: 2,
-                      display: "flex",
-                      justifyContent:
-                        "space-between",
-                      gap: 2,
+                    item={{
+                      id: item.id,
+                      productName: item.productName,
+                      sku: item.sku,
+                      quantity: item.quantity,
+                      unitSellingPrice: item.unitSellingPrice,
+                      lineTotal: item.lineTotal,
+                      status: order.status,
                     }}
-                  >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        sx={{ fontWeight: 600 }}
-                      >
-                        {item.productName}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        SKU: {item.sku || "—"}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        Quantity: {item.quantity}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        MRP:{" "}
-                        {formatMoney(item.unitMrp)}
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                      >
-                        Selling Price:{" "}
-                        {formatMoney(
-                          item.unitSellingPrice
-                        )}
-                      </Typography>
-
-                      {Number(
-                        item.discountAmount ?? 0
-                      ) > 0 && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          Discount:{" "}
-                          {formatMoney(
-                            item.discountAmount
-                          )}
-                        </Typography>
-                      )}
-                    </Box>
-
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {formatMoney(item.lineTotal)}
-                    </Typography>
-                  </Box>
+                    showThumbnail
+                  />
                 ))}
               </Stack>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent
-              sx={{
-                p: { xs: 2, md: 3 },
-              }}
-            >
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 700 }}
-                gutterBottom
-              >
-                Payment & Summary
-              </Typography>
-
-              <Stack spacing={1.5}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography>
-                    Payment Method
-                  </Typography>
-
+          <Grid container spacing={3} sx={{ alignItems: "stretch" }}>
+            <Grid size={{ xs: 12, md: 6 }} sx={{ display: "flex" }}>
+              <Card sx={{ width: "100%", height: "100%" }}>
+                <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
                   <Typography
-                    sx={{ fontWeight: 600 }}
+                    variant="h6"
+                    sx={{ fontWeight: 700, mb: 2 }}
                   >
-                    {order.paymentMethod === "COD"
-                      ? "Cash on Delivery"
-                      : order.paymentMethod === "ONLINE"
-                        ? "Online Payment"
-                        : "Not available"}
+                    Shipping Address
                   </Typography>
-                </Box>
 
-                {order.paymentStatus && (
+                  {shippingAddress ? (
+                    <Stack spacing={1}>
+                      {order.shippingFullName && (
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {order.shippingFullName}
+                        </Typography>
+                      )}
+                      {order.shippingPhoneNumber && (
+                        <Typography variant="body2" color="text.secondary">
+                          {order.shippingPhoneNumber}
+                        </Typography>
+                      )}
+                      {order.shippingStreetAddress && (
+                        <Typography variant="body2" color="text.secondary">
+                          {order.shippingStreetAddress}
+                        </Typography>
+                      )}
+                      {order.shippingLandmark && (
+                        <Typography variant="body2" color="text.secondary">
+                          {order.shippingLandmark}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" color="text.secondary">
+                        {[
+                          order.shippingCity,
+                          order.shippingState,
+                          order.shippingPostalCode,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </Typography>
+                      {order.shippingCountry && (
+                        <Typography variant="body2" color="text.secondary">
+                          {order.shippingCountry}
+                        </Typography>
+                      )}
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Shipping address not available.
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }} sx={{ display: "flex" }}>
+              <Card sx={{ width: "100%", height: "100%" }}>
+                <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, mb: 2 }}
+                  >
+                    Payment & Summary
+                  </Typography>
+
+                  <Stack spacing={1.5}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <Typography>Payment Method</Typography>
+                      <Typography sx={{ fontWeight: 600 }}>
+                        {order.paymentMethod === "COD"
+                          ? "Cash on Delivery"
+                          : order.paymentMethod === "ONLINE"
+                            ? "Online Payment"
+                            : "Not available"}
+                      </Typography>
+                    </Box>
+
+                    {order.paymentStatus && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        <Typography>Payment Status</Typography>
+                        <OrderStatusChip
+                          status={order.paymentStatus}
+                          size="small"
+                        />
+                      </Box>
+                    )}
+
+                    <PriceBreakdown
+                      subtotal={order.subtotal}
+                      discountAmount={order.discountAmount}
+                      shippingCharge={order.shippingCharge}
+                      taxAmount={order.taxAmount}
+                      totalAmount={order.totalAmount}
+                      currency={order.currency}
+                    />
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {canCancel(order.status) && (
+            <Card>
+              <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+                <Stack spacing={2}>
                   <Box
                     sx={{
                       display: "flex",
-                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 1,
                     }}
                   >
-                    <Typography>Payment Status</Typography>
-                    <Typography sx={{ fontWeight: 600, textTransform: "capitalize" }}>
-                      {order.paymentStatus.toLowerCase().replaceAll("_", " ")}
+                    <Chip
+                      size="small"
+                      color="error"
+                      label="Cancellation"
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      You can cancel this order while it is still being processed.
                     </Typography>
                   </Box>
-                )}
 
-                <Divider />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography>
-                    Subtotal
-                  </Typography>
-
-                  <Typography>
-                    {formatMoney(
-                      order.subtotal
-                    )}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography>
-                    Discount
-                  </Typography>
-
-                  <Typography>
-                    -
-                    {formatMoney(
-                      order.discountAmount
-                    )}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography>
-                    Shipping
-                  </Typography>
-
-                  <Typography>
-                    {formatMoney(
-                      order.shippingCharge
-                    )}
-                  </Typography>
-                </Box>
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography>
-                    Tax
-                  </Typography>
-
-                  <Typography>
-                    {formatMoney(
-                      order.taxAmount
-                    )}
-                  </Typography>
-                </Box>
-
-                <Divider />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                  }}
-                >
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 700 }}
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    disabled={cancelling}
+                    onClick={() => setConfirmOpen(true)}
+                    sx={{ minHeight: 44 }}
                   >
-                    Total
-                  </Typography>
-
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 700 }}
-                  >
-                    {formatMoney(
-                      order.totalAmount
-                    )}
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+                    {cancelling ? "Cancelling..." : "Cancel Order"}
+                  </Button>
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
         </Stack>
-      </Box>
 
-      <Footer />
-    </>
+        <ConfirmActionDialog
+          id="cancel-order-dialog"
+          open={confirmOpen}
+          title="Cancel this order?"
+          description={
+            "Cancelling order " +
+            (order.orderNumber || `#${order.id}`) +
+            " cannot be undone."
+          }
+          confirmLabel="Cancel Order"
+          cancelLabel="Keep Order"
+          confirming={cancelling}
+          tone="danger"
+          onConfirm={handleCancelOrder}
+          onClose={() => setConfirmOpen(false)}
+        />
+
+        <Footer />
+      </Box>
+    </Box>
   );
 }
