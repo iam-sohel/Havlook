@@ -1,10 +1,7 @@
 import { Grid } from "@mui/material";
 
 import ProductCard from "./ProductCard";
-import {
-  enrichProductListWithDetails,
-  listProducts,
-} from "@/services/productService";
+import { listProducts } from "@/services/productService";
 import { getProductImage } from "@/utils/productImages";
 import type { Product } from "@/types/product";
 
@@ -36,7 +33,7 @@ export default async function ProductGrid() {
   const products: Product[] =
     list.source === "error" ? [] : list.products;
 
-  const enriched = await enrichProductListWithDetails(products);
+  const enriched = products;
 
   return (
     <Grid container spacing={3}>
