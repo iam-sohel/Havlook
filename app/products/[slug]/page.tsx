@@ -8,7 +8,6 @@ import {
   getProductBySlug,
   listProducts,
   getProductDetailsById,
-  enrichProductListWithDetails,
 } from "@/services/productService";
 
 /**
@@ -69,7 +68,7 @@ export default async function ProductDetailsPage(props: PageProps) {
     .sort((a, b) => Number(b.rating) - Number(a.rating))
     .slice(0, 4);
 
-  const related = await enrichProductListWithDetails(relatedCandidates);
+  const related = relatedCandidates;
 
   return (
     <>
