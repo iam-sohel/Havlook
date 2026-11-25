@@ -1,4 +1,4 @@
-﻿import { Box, Typography, Container } from "@mui/material";
+import { Box, Typography, Container } from "@mui/material";
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -29,18 +29,54 @@ export default async function HomePage() {
 
   const MOBILE_SUBCATEGORY_ID = 1;
 
-  const [result, enrichedMobileProducts] = await Promise.all([
-    listProducts(),
-    getProductsBySubCategory(MOBILE_SUBCATEGORY_ID).then(async (mobileResult) => {
-      if (!mobileResult.ok) {
-        return [];
-      }
+  const homepageStartedAt = Date.now();
 
-      return enrichProductListWithDetails(mobileResult.data, {
-        concurrency: 5,
+  const timedCatalogue = async () => {
+    const startedAt = Date.now();
+    const value = await listProducts();
+    console.info("[HAVLOOK_HOME_TIMING] listProducts", {
+      durationMs: Date.now() - startedAt,
+      source: value.source,
+      productCount: value.source === "backend" ? value.products.length : 0,
+    });
+    return value;
+  };
+
+  const timedMobileDeals = async () => {
+    const startedAt = Date.now();
+    const mobileResult = await getProductsBySubCategory(MOBILE_SUBCATEGORY_ID);
+    const subcategoryDurationMs = Date.now() - startedAt;
+
+    if (!mobileResult.ok) {
+      console.info("[HAVLOOK_HOME_TIMING] mobile subcategory", {
+        durationMs: subcategoryDurationMs,
+        ok: false,
       });
-    }),
+      return [];
+    }
+
+    const enrichmentStartedAt = Date.now();
+    const products = await enrichProductListWithDetails(mobileResult.data, {
+      concurrency: 5,
+    });
+    console.info("[HAVLOOK_HOME_TIMING] mobile pipeline", {
+      subcategoryDurationMs,
+      enrichmentDurationMs: Date.now() - enrichmentStartedAt,
+      totalDurationMs: Date.now() - startedAt,
+      candidateCount: mobileResult.data.length,
+      enrichedCount: products.length,
+    });
+    return products;
+  };
+
+  const [result, enrichedMobileProducts] = await Promise.all([
+    timedCatalogue(),
+    timedMobileDeals(),
   ]);
+
+  console.info("[HAVLOOK_HOME_TIMING] data phase total", {
+    durationMs: Date.now() - homepageStartedAt,
+  });
 
   const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
