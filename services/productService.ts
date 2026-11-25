@@ -411,6 +411,7 @@ export async function enrichProductListWithDetails(
   products: Product[],
   options: {
     signal?: AbortSignal;
+    concurrency?: number;
   } = {},
 ): Promise<Product[]> {
   if (
@@ -423,6 +424,10 @@ export async function enrichProductListWithDetails(
   const {
     signal,
   } = options;
+  const concurrency = Math.min(
+    8,
+    Math.max(1, Math.floor(options.concurrency ?? ENRICH_CONCURRENCY)),
+  );
 
   const out: Product[] =
     new Array(products.length);
@@ -430,11 +435,11 @@ export async function enrichProductListWithDetails(
   for (
     let i = 0;
     i < products.length;
-    i += ENRICH_CONCURRENCY
+    i += concurrency
   ) {
     const batch = products.slice(
       i,
-      i + ENRICH_CONCURRENCY,
+      i + concurrency,
     );
 
     const responses =
@@ -635,8 +640,9 @@ export async function getProductsByCategory(
  * 5 Electronics + 3 products from other categories.
  */
 export async function getFeaturedProducts(): Promise<Product[]> {
-  const ELECTRONICS_CATEGORY_IDS = [1, 8, 16];
-  const OTHER_CATEGORY_IDS = [3, 10, 14, 19, 23, 24];
+  // Current active backend catalog has one category: Electronics (ID 3).
+  const ELECTRONICS_CATEGORY_IDS = [3];
+  const OTHER_CATEGORY_IDS: number[] = [];
   const PAGE_SIZE = 20;
 
   const shuffle = <T,>(items: T[]): T[] => {
