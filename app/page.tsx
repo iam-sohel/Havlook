@@ -17,8 +17,7 @@ import type { Product } from "@/types/product";
  * HAVLOOK - Home page (Server Component).
  *
  * Backend is the single source of truth for product data.
- * Catalogue and mobile deal requests run in parallel; only mobile deal
- * candidates receive bounded detail enrichment.
+ * The homepage requests the complete active catalogue in one batched call.
  */
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
