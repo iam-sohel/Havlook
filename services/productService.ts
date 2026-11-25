@@ -42,7 +42,8 @@ export type {
 const ENDPOINTS = {
   /* ----------------------------- Catalogue ------------------------------ */
 
-  products: "/api/v1/products",
+  products: (page = 0, size = 10) =>
+    `/api/v1/products?page=${page}&size=${size}`,
 
   productById: (id: string | number) =>
     `/api/v1/products/${encodeURIComponent(String(id))}`,
@@ -852,6 +853,7 @@ export type ListProductsResult =
 
 interface ListProductsOptions {
   signal?: AbortSignal;
+  size?: number;
 }
 
 /**
@@ -877,7 +879,7 @@ export async function listProducts(
 
   const result =
     await apiRequest<BackendProductPageResponse>(
-      ENDPOINTS.products,
+      ENDPOINTS.products(0, options.size ?? 10),
       {
         method: "GET",
         signal,
