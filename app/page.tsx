@@ -23,6 +23,8 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
+  const MOBILE_SUBCATEGORY_ID = 1;
+
   // The public catalogue endpoint already returns complete ProductDetails DTOs.
   // Fetch the active catalogue in one batched request so the homepage does not
   // issue 20 additional per-product detail requests for mobile deals.
