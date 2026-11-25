@@ -10,11 +10,7 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import {
-  enrichProductListWithDetails,
-  getProductsBySubCategory,
-  listProducts,
-} from "@/services/productService";
+import { listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
@@ -27,55 +23,15 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
-  const MOBILE_SUBCATEGORY_ID = 1;
-
+  // The public catalogue endpoint already returns complete ProductDetails DTOs.
+  // Fetch the active catalogue in one batched request so the homepage does not
+  // issue 20 additional per-product detail requests for mobile deals.
   const homepageStartedAt = Date.now();
-
-  const timedCatalogue = async () => {
-    const startedAt = Date.now();
-    const value = await listProducts();
-    console.info("[HAVLOOK_HOME_TIMING] listProducts", {
-      durationMs: Date.now() - startedAt,
-      source: value.source,
-      productCount: value.source === "backend" ? value.products.length : 0,
-    });
-    return value;
-  };
-
-  const timedMobileDeals = async () => {
-    const startedAt = Date.now();
-    const mobileResult = await getProductsBySubCategory(MOBILE_SUBCATEGORY_ID);
-    const subcategoryDurationMs = Date.now() - startedAt;
-
-    if (!mobileResult.ok) {
-      console.info("[HAVLOOK_HOME_TIMING] mobile subcategory", {
-        durationMs: subcategoryDurationMs,
-        ok: false,
-      });
-      return [];
-    }
-
-    const enrichmentStartedAt = Date.now();
-    const products = await enrichProductListWithDetails(mobileResult.data, {
-      concurrency: 8,
-    });
-    console.info("[HAVLOOK_HOME_TIMING] mobile pipeline", {
-      subcategoryDurationMs,
-      enrichmentDurationMs: Date.now() - enrichmentStartedAt,
-      totalDurationMs: Date.now() - startedAt,
-      candidateCount: mobileResult.data.length,
-      enrichedCount: products.length,
-    });
-    return products;
-  };
-
-  const [result, enrichedMobileProducts] = await Promise.all([
-    timedCatalogue(),
-    timedMobileDeals(),
-  ]);
-
-  console.info("[HAVLOOK_HOME_TIMING] data phase total", {
+  const result = await listProducts({ size: 50 });
+  console.info("[HAVLOOK_HOME_TIMING] catalogue", {
     durationMs: Date.now() - homepageStartedAt,
+    source: result.source,
+    productCount: result.source === "backend" ? result.products.length : 0,
   });
 
   const allProducts: Product[] =
@@ -98,7 +54,7 @@ export default async function HomePage() {
 
   /* ----------------------------- Deals subset --------------------------- */
 
-  const dealProducts = enrichedMobileProducts
+  const dealProducts = allProducts
     .filter((product) => {
       const hasValidDiscount =
         typeof product.discount === "number" &&
@@ -109,9 +65,11 @@ export default async function HomePage() {
       const hasValidPrice =
         Number(product.originalPrice) > Number(product.price) &&
         product.price > 0;
+
       return (
         Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID &&
-        hasValidDiscount && hasValidPrice
+        hasValidDiscount &&
+        hasValidPrice
       );
     })
     .slice(0, 8)
