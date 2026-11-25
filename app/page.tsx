@@ -10,7 +10,7 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { enrichProductListWithDetails, getFeaturedProducts, getProductsBySubCategory, listProducts } from "@/services/productService";
+import { enrichProductListWithDetails, getProductsBySubCategory, listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
@@ -23,16 +23,26 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
-  const [result, featuredProducts, mobileResult] = await Promise.all([
+  const MOBILE_SUBCATEGORY_ID = 1;
+
+  const [result, enrichedMobileProducts] = await Promise.all([
     listProducts(),
-    getFeaturedProducts(),
-    getProductsBySubCategory(1),
+    getProductsBySubCategory(MOBILE_SUBCATEGORY_ID).then(async (mobileResult) => {
+      if (!mobileResult.ok) {
+        return [];
+      }
+
+      return enrichProductListWithDetails(mobileResult.data, {
+        concurrency: 5,
+      });
+    }),
   ]);
 
   const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
 
   const hasProducts = allProducts.length > 0;
+  const featuredProducts = allProducts.slice(0, 5);
 
   /* ----------------------------- Hero subset ---------------------------- */
 
@@ -47,10 +57,6 @@ export default async function HomePage() {
 
 
   /* ----------------------------- Deals subset --------------------------- */
-
-  const MOBILE_SUBCATEGORY_ID = 1;
-  const mobileProducts = mobileResult.ok ? mobileResult.data : [];
-  const enrichedMobileProducts = await enrichProductListWithDetails(mobileProducts);
 
   const dealProducts = enrichedMobileProducts
     .filter((product) => {
@@ -146,8 +152,6 @@ export default async function HomePage() {
           <CategoryBar />
         </Box>
 
- * Product details are already included in the catalogue response.
- * No additional product enrichment API calls are required.
         {heroProduct ? (
           <Hero product={heroProduct} />
         ) : null}
