@@ -57,7 +57,7 @@ export default async function HomePage() {
 
     const enrichmentStartedAt = Date.now();
     const products = await enrichProductListWithDetails(mobileResult.data, {
-      concurrency: 5,
+      concurrency: 8,
     });
     console.info("[HAVLOOK_HOME_TIMING] mobile pipeline", {
       subcategoryDurationMs,
