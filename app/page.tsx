@@ -10,15 +10,19 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { enrichProductListWithDetails, getProductsBySubCategory, listProducts } from "@/services/productService";
+import {
+  enrichProductListWithDetails,
+  getProductsBySubCategory,
+  listProducts,
+} from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
  * HAVLOOK - Home page (Server Component).
  *
  * Backend is the single source of truth for product data.
- * Product details are already included in the catalogue response.
- * No additional product enrichment API calls are required.
+ * Catalogue and mobile deal requests run in parallel; only mobile deal
+ * candidates receive bounded detail enrichment.
  */
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
