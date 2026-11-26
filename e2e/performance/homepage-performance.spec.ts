@@ -88,9 +88,8 @@ test("Homepage records Core Web Vitals and catalogue network performance", async
     const navigation = performance.getEntriesByType(
       "navigation",
     )[0] as PerformanceNavigationTiming | undefined;
-    const fcpEntry = performance
-      .getEntriesByName("first-contentful-paint")
-      .at(0);
+    const fcpEntries = performance.getEntriesByName("first-contentful-paint");
+    const fcpEntry = fcpEntries[0];
     const stored = (
       window as Window & {
         __havlookVitals?: { lcp: number | null; cls: number };
