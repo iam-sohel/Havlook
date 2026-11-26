@@ -1,4 +1,5 @@
-import { Box, Typography, Container } from "@mui/material";
+import { Suspense } from "react";
+import { Box, Typography, Container, Skeleton } from "@mui/material";
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -14,19 +15,13 @@ import { listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
- * HAVLOOK - Home page (Server Component).
- *
- * Backend is the single source of truth for product data.
- * The homepage requests the complete active catalogue in one batched call.
+ * Loads backend catalogue data inside a Suspense boundary.
+ * Keeping this async work below the page shell allows Next.js to stream
+ * the header and category navigation before the catalogue request finishes.
  */
-export default async function HomePage() {
-  /* -------------------------- Fetch products ---------------------------- */
-
+async function HomepageCatalogueSections() {
   const MOBILE_SUBCATEGORY_ID = 1;
 
-  // The public catalogue endpoint already returns complete ProductDetails DTOs.
-  // Fetch the active catalogue in one batched request so the homepage does not
-  // issue 20 additional per-product detail requests for mobile deals.
   const homepageStartedAt = Date.now();
   const result = await listProducts({ size: 50 });
   console.info("[HAVLOOK_HOME_TIMING] catalogue", {
@@ -41,19 +36,12 @@ export default async function HomePage() {
   const hasProducts = allProducts.length > 0;
   const featuredProducts = allProducts.slice(0, 5);
 
-  /* ----------------------------- Hero subset ---------------------------- */
-
   const heroProduct =
     allProducts.find(
       (product) =>
         typeof product.discount === "number" &&
         product.discount > 0,
     ) ?? allProducts[0];
-
-  /* --------------------------- Featured subset -------------------------- */
-
-
-  /* ----------------------------- Deals subset --------------------------- */
 
   const dealProducts = allProducts
     .filter((product) => {
@@ -79,8 +67,6 @@ export default async function HomePage() {
       offer: `${product.discount}% OFF`,
     }));
 
-  /* ------------------------ Electronics subset -------------------------- */
-
   const ELECTRONICS_CATEGORIES = new Set([
     "Mobiles",
     "Laptops",
@@ -99,13 +85,9 @@ export default async function HomePage() {
 
   const electronicsProducts = allProducts
     .filter((product) =>
-      electronicsCategoryKeys.has(
-        normalizeCategory(product.category),
-      ),
+      electronicsCategoryKeys.has(normalizeCategory(product.category)),
     )
     .slice(0, 8);
-
-  /* -------------------------- Fashion subset ---------------------------- */
 
   const FASHION_CATEGORIES = new Set([
     "Men's Fashion",
@@ -119,18 +101,81 @@ export default async function HomePage() {
 
   const fashionProducts = allProducts
     .filter((product) =>
-      fashionCategoryKeys.has(
-        normalizeCategory(product.category),
-      ),
+      fashionCategoryKeys.has(normalizeCategory(product.category)),
     )
     .slice(0, 8);
 
-  /* ------------------------------- Render -------------------------------- */
+  if (!hasProducts) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 6 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+          Products are temporarily unavailable
+        </Typography>
+        <Typography color="text.secondary">
+          We could not reach the product catalogue. Please try again in a moment.
+        </Typography>
+      </Container>
+    );
+  }
 
   return (
     <>
-      <Header />
+      {heroProduct ? <Hero product={heroProduct} /> : null}
+      <FeaturedProducts products={featuredProducts} />
+      <DealsSection products={dealProducts} />
+      <ElectronicsSection products={electronicsProducts} />
+      <FashionSection products={fashionProducts} />
+    </>
+  );
+}
 
+function HomepageCatalogueFallback() {
+  return (
+    <Box
+      role="status"
+      aria-label="Loading homepage products"
+      sx={{
+        px: { xs: 2, sm: 3, md: 5 },
+        pt: { xs: 2, md: 3 },
+        minHeight: { xs: 760, md: 680 },
+      }}
+    >
+      <Skeleton
+        variant="rounded"
+        height={260}
+        sx={{ borderRadius: 3, mb: 3 }}
+      />
+      <Skeleton variant="text" width="36%" height={38} sx={{ mb: 1 }} />
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 2,
+        }}
+      >
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton
+            key={index}
+            variant="rounded"
+            height={{ xs: 190, sm: 220, md: 250 }}
+            sx={{ borderRadius: 2 }}
+          />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+/**
+ * HAVLOOK — Home page (Server Component).
+ *
+ * The shell streams immediately; only backend-dependent catalogue sections
+ * wait for the single batched catalogue request.
+ */
+export default function HomePage() {
+  return (
+    <>
+      <Header />
       <Box
         sx={{
           bgcolor: "background.default",
@@ -140,7 +185,6 @@ export default async function HomePage() {
           overflowX: "hidden",
         }}
       >
-        {/* Categories */}
         <Box
           sx={{
             pt: { xs: 1, sm: 1.5 },
@@ -151,37 +195,12 @@ export default async function HomePage() {
           <CategoryBar />
         </Box>
 
-        {heroProduct ? (
-          <Hero product={heroProduct} />
-        ) : null}
-
-        {/* Homepage Sections */}
-        {hasProducts ? (
-          <>
-            <FeaturedProducts products={featuredProducts} />
-            <DealsSection products={dealProducts} />
-            <ElectronicsSection products={electronicsProducts} />
-            <FashionSection products={fashionProducts} />
-          </>
-        ) : (
-          <Container maxWidth="xl" sx={{ py: 6 }}>
-            <Typography
-              variant="h5"
-              sx={{ fontWeight: 700, mb: 2 }}
-            >
-              Products are temporarily unavailable
-            </Typography>
-
-            <Typography color="text.secondary">
-              We could not reach the product catalogue. Please
-              try again in a moment.
-            </Typography>
-          </Container>
-        )}
+        <Suspense fallback={<HomepageCatalogueFallback />}>
+          <HomepageCatalogueSections />
+        </Suspense>
 
         <Newsletter />
       </Box>
-
       <Footer />
     </>
   );
