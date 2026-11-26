@@ -157,8 +157,10 @@ function HomepageCatalogueFallback() {
           <Skeleton
             key={index}
             variant="rounded"
-            height={{ xs: 190, sm: 220, md: 250 }}
-            sx={{ borderRadius: 2 }}
+            sx={{
+              borderRadius: 2,
+              height: { xs: 190, sm: 220, md: 250 },
+            }}
           />
         ))}
       </Box>
