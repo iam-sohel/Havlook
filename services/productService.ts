@@ -911,6 +911,11 @@ export async function listProducts(
     };
   }
 
+  const debugCatalogueNormalization =
+    typeof window === "undefined" && options.size === 50;
+  const normalizationStartedAt = debugCatalogueNormalization
+    ? Date.now()
+    : 0;
   const products =
     page.content
       .map((dto) => {
@@ -928,6 +933,15 @@ export async function listProducts(
         ): product is Product =>
           product !== null,
       );
+
+  if (debugCatalogueNormalization) {
+    console.info("[HAVLOOK_CATALOGUE_NORMALIZE]", {
+      durationMs: Date.now() - normalizationStartedAt,
+      rawProductCount: page.content.length,
+      normalizedProductCount: products.length,
+      droppedProductCount: page.content.length - products.length,
+    });
+  }
 
   return {
     source: "backend",
