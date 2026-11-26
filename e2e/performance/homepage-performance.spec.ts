@@ -5,6 +5,14 @@ type HomepageVitals = {
   lcp: number | null;
   cls: number;
   ttfb: number | null;
+  lcpElement: {
+    tagName: string;
+    id: string;
+    className: string;
+    imageUrl: string | null;
+    entryUrl: string | null;
+    size: number | null;
+  } | null;
 };
 
 test("Homepage records Core Web Vitals and browser API network health", async ({
@@ -45,6 +53,14 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
   await page.addInitScript(() => {
     const metrics = {
       lcp: null as number | null,
+      lcpElement: null as {
+        tagName: string;
+        id: string;
+        className: string;
+        imageUrl: string | null;
+        entryUrl: string | null;
+        size: number | null;
+      } | null,
       cls: 0,
     };
 
@@ -54,8 +70,33 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
     try {
       const lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        const lastEntry = entries[entries.length - 1];
-        if (lastEntry) metrics.lcp = lastEntry.startTime;
+        const lastEntry = entries[entries.length - 1] as
+          | (PerformanceEntry & {
+              element?: Element;
+              size?: number;
+              url?: string;
+            })
+          | undefined;
+        if (lastEntry) {
+          const element = lastEntry.element;
+          metrics.lcp = lastEntry.startTime;
+          metrics.lcpElement = element
+            ? {
+                tagName: element.tagName,
+                id: element.id,
+                className:
+                  typeof element.className === "string"
+                    ? element.className
+                    : element.getAttribute("class") ?? "",
+                imageUrl:
+                  element instanceof HTMLImageElement
+                    ? element.currentSrc || element.src
+                    : null,
+                entryUrl: lastEntry.url ?? null,
+                size: lastEntry.size ?? null,
+              }
+            : null;
+        }
       });
       lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
 
@@ -95,13 +136,18 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
     const fcpEntry = fcpEntries[0];
     const stored = (
       window as Window & {
-        __havlookVitals?: { lcp: number | null; cls: number };
+        __havlookVitals?: {
+          lcp: number | null;
+          lcpElement: HomepageVitals["lcpElement"];
+          cls: number;
+        };
       }
     ).__havlookVitals;
 
     return {
       fcp: fcpEntry?.startTime ?? null,
       lcp: stored?.lcp ?? null,
+      lcpElement: stored?.lcpElement ?? null,
       cls: stored?.cls ?? 0,
       ttfb: navigation
         ? navigation.responseStart - navigation.requestStart
