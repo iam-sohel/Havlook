@@ -13,6 +13,16 @@ type HomepageVitals = {
     entryUrl: string | null;
     size: number | null;
   } | null;
+  lcpImageResource: {
+    durationMs: number;
+    startTimeMs: number;
+    responseStartMs: number;
+    responseEndMs: number;
+    transferSizeBytes: number;
+    encodedBodySizeBytes: number;
+    decodedBodySizeBytes: number;
+    nextHopProtocol: string;
+  } | null;
 };
 
 test("Homepage records Core Web Vitals and browser API network health", async ({
@@ -148,6 +158,28 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
       fcp: fcpEntry?.startTime ?? null,
       lcp: stored?.lcp ?? null,
       lcpElement: stored?.lcpElement ?? null,
+      lcpImageResource: (() => {
+        const imageUrl = stored?.lcpElement?.imageUrl;
+        if (!imageUrl) return null;
+        const resource = performance
+          .getEntriesByName(imageUrl, "resource")
+          .filter(
+            (entry): entry is PerformanceResourceTiming =>
+              entry instanceof PerformanceResourceTiming,
+          )
+          .at(-1);
+        if (!resource) return null;
+        return {
+          durationMs: resource.duration,
+          startTimeMs: resource.startTime,
+          responseStartMs: resource.responseStart,
+          responseEndMs: resource.responseEnd,
+          transferSizeBytes: resource.transferSize,
+          encodedBodySizeBytes: resource.encodedBodySize,
+          decodedBodySizeBytes: resource.decodedBodySize,
+          nextHopProtocol: resource.nextHopProtocol,
+        };
+      })(),
       cls: stored?.cls ?? 0,
       ttfb: navigation
         ? navigation.responseStart - navigation.requestStart
