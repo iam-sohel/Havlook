@@ -76,7 +76,10 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
     }
   });
 
-  // The homepage catalogue is fetched by the Next.js server component. That server-to-server\n  // request is included in navigation TTFB but is not visible as a browser API request.\n  // These API arrays intentionally cover client-side browser requests only.\n  const response = await page.goto("/", { waitUntil: "load" });
+  // The homepage catalogue is fetched by the Next.js server component. That server-to-server
+  // request is included in navigation TTFB but is not visible as a browser API request.
+  // These API arrays intentionally cover client-side browser requests only.
+  const response = await page.goto("/", { waitUntil: "load" });
   expect(response, "Homepage returned no document response").not.toBeNull();
   expect(response!.status()).toBe(200);
   await expect(page.locator("body")).toBeVisible();
@@ -127,5 +130,6 @@ test("Homepage records Core Web Vitals and browser API network health", async ({
   expect(vitals.ttfb, "Navigation TTFB was not recorded").not.toBeNull();
   expect(vitals.cls, "CLS regression guard").toBeLessThanOrEqual(0.25);
   expect(vitals.lcp!, "LCP regression guard (5 seconds)").toBeLessThan(5000);
-  // Production SSR currently takes about 2.0–2.3s locally; allow modest runtime variance.\n  expect(vitals.ttfb!, "TTFB regression guard (3 seconds)").toBeLessThan(3000);
+  // Production SSR currently takes about 2.0–2.3s locally; allow modest runtime variance.
+  expect(vitals.ttfb!, "TTFB regression guard (3 seconds)").toBeLessThan(3000);
 });
