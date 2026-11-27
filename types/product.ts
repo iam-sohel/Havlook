@@ -145,7 +145,9 @@ export interface Product {
   title: string;
   description: string;
 
+  shortDescription?: string;
   brand: string;
+  manufacturer?: string;
   category: string;
   categoryId?: number | string;
   subCategoryId?: number | string;

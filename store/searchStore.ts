@@ -352,9 +352,9 @@ const useSearchStore =
          */
 
         // Enrich products with detail data (images, prices, ratings, etc.)
-        const enrichedProducts = await enrichProductListWithDetails(
-          products,
-        );
+        const enrichedProducts = query.trim()
+          ? await enrichProductListWithDetails(products)
+          : products;
 
         const nextState = get();
 

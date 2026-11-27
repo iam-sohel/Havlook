@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import ClientProductGrid from "@/components/products/ClientProductGrid";
+import CategoryProductGrid from "@/components/products/CategoryProductGrid";
 
 import {
   Alert,
@@ -153,8 +153,7 @@ export default async function CategoryPage(props: PageProps) {
     );
   }
 
-  // Product details are fetched lazily by the client grid as cards approach
-  // the viewport, with a shared three-request concurrency limit.
+  // Category cards load complete details lazily when approaching the viewport.
   const visibleProducts = productSummaries;
 
   return (
@@ -179,7 +178,7 @@ export default async function CategoryPage(props: PageProps) {
         )}
 
         {visibleProducts.length > 0 ? (
-          <ClientProductGrid products={visibleProducts} />
+          <CategoryProductGrid products={visibleProducts} />
         ) : (
           <EmptyProducts />
         )}

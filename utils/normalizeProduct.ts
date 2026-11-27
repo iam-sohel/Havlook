@@ -588,6 +588,29 @@ export function normalizeBackendProductDetails(
         "",
       );
 
+  const shortDescription =
+    product.information?.shortDescription?.trim() || undefined;
+
+  const manufacturer =
+    product.information?.manufacturer?.trim() || undefined;
+
+  const warranty =
+    product.information?.warranty?.trim() || undefined;
+
+  const specifications =
+    (product.specifications ?? []).reduce<Record<string, string>>(
+      (result, specification) => {
+        const key = specification.specificationName?.trim();
+        const value = specification.specificationValue?.trim();
+
+        if (key && value) {
+          result[key] = value;
+        }
+
+        return result;
+      },
+      {},
+    );
   return {
     id:
       toString(product.id),
@@ -605,6 +628,10 @@ export function normalizeBackendProductDetails(
         ?.longDescription ??
       "",
 
+    shortDescription,
+    manufacturer,
+    warranty,
+    specifications,
     price:
       pricing.price,
 
