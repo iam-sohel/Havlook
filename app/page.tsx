@@ -10,7 +10,7 @@ import ElectronicsSection from "@/components/home/ElectronicsSection";
 import FashionSection from "@/components/home/FashionSection";
 import Newsletter from "@/components/home/Newsletter";
 
-import { enrichProductListWithDetails, getFeaturedProducts, getProductsBySubCategory, listProducts } from "@/services/productService";
+import { listProducts } from "@/services/productService";
 import type { Product } from "@/types/product";
 
 /**
@@ -23,16 +23,23 @@ import type { Product } from "@/types/product";
 export default async function HomePage() {
   /* -------------------------- Fetch products ---------------------------- */
 
-  const [result, featuredProducts, mobileResult] = await Promise.all([
-    listProducts(),
-    getFeaturedProducts(),
-    getProductsBySubCategory(1),
-  ]);
+  // Fetch the full backend catalogue once. The catalogue response already
+  // contains the product fields used by homepage cards and sections; making
+  // separate featured/subcategory/detail requests here only multiplies SSR
+  // latency and can cause the edge page request to exceed its time budget.
+  const result = await listProducts();
 
   const allProducts: Product[] =
     result.source === "backend" ? result.products : [];
 
   const hasProducts = allProducts.length > 0;
+
+  const explicitlyFeatured = allProducts.filter(
+    (product) => product.featured === true,
+  );
+  const featuredProducts = (
+    explicitlyFeatured.length > 0 ? explicitlyFeatured : allProducts
+  ).slice(0, 8);
 
   /* ----------------------------- Hero subset ---------------------------- */
 
@@ -49,10 +56,12 @@ export default async function HomePage() {
   /* ----------------------------- Deals subset --------------------------- */
 
   const MOBILE_SUBCATEGORY_ID = 1;
-  const mobileProducts = mobileResult.ok ? mobileResult.data : [];
-  const enrichedMobileProducts = await enrichProductListWithDetails(mobileProducts);
+  const mobileProducts = allProducts.filter(
+    (product) =>
+      Number(product.subCategoryId) === MOBILE_SUBCATEGORY_ID,
+  );
 
-  const dealProducts = enrichedMobileProducts
+  const dealProducts = mobileProducts
     .filter((product) => {
       const hasValidDiscount =
         typeof product.discount === "number" &&
