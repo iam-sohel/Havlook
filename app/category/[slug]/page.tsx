@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import ClientProductGrid from "@/components/products/ClientProductGrid";
+import CategoryProductGrid from "@/components/products/CategoryProductGrid";
 
 import {
   Alert,
@@ -17,7 +17,6 @@ import { listCategories } from "@/services/catalogService";
 
 import {
   getProductsByCategory,
-  enrichProductListWithDetails,
   type Product,
 } from "@/services/productService";
 
@@ -154,10 +153,8 @@ export default async function CategoryPage(props: PageProps) {
     );
   }
 
-  // Limit detail requests to avoid overwhelming the backend.
-  const enrichedProducts = await enrichProductListWithDetails(
-    productSummaries.slice(0, 40),
-  );
+  // Category cards load complete details lazily when approaching the viewport.
+  const visibleProducts = productSummaries;
 
   return (
     <>
@@ -174,8 +171,14 @@ export default async function CategoryPage(props: PageProps) {
           </Typography>
         </Box>
 
-        {enrichedProducts.length > 0 ? (
-          <ClientProductGrid products={enrichedProducts} />
+        {firstRequestError && visibleProducts.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Some products could not be loaded: {firstRequestError}
+          </Alert>
+        )}
+
+        {visibleProducts.length > 0 ? (
+          <CategoryProductGrid products={visibleProducts} />
         ) : (
           <EmptyProducts />
         )}

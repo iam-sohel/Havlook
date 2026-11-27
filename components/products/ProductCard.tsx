@@ -15,6 +15,7 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  Skeleton,
 } from "@mui/material";
 
 import StarIcon from "@mui/icons-material/Star";
@@ -45,6 +46,7 @@ interface ProductCardProps {
   bestseller?: boolean;
   newArrival?: boolean;
   outOfStock?: boolean;
+  detailsLoading?: boolean;
 }
 
 export default function ProductCard({
@@ -61,6 +63,7 @@ export default function ProductCard({
   bestseller = false,
   newArrival = false,
   outOfStock = false,
+  detailsLoading = false,
 }: ProductCardProps) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
 
@@ -454,18 +457,27 @@ export default function ProductCard({
             rowGap: 0.25,
           }}
         >
-          <Typography
-            sx={{
-              fontSize: { xs: "1.0625rem", sm: "1.1875rem" },
-              fontWeight: 800,
-              color: "text.primary",
-              letterSpacing: "-0.01em",
-              fontVariantNumeric: "tabular-nums",
-              lineHeight: 1.2,
-            }}
-          >
-            {formatPrice(Number(price))}
-          </Typography>
+          {detailsLoading ? (
+            <Skeleton
+              variant="text"
+              width={88}
+              height={30}
+              aria-label="Loading product price"
+            />
+          ) : (
+            <Typography
+              sx={{
+                fontSize: { xs: "1.0625rem", sm: "1.1875rem" },
+                fontWeight: 800,
+                color: "text.primary",
+                letterSpacing: "-0.01em",
+                fontVariantNumeric: "tabular-nums",
+                lineHeight: 1.2,
+              }}
+            >
+              {Number(price) > 0 ? formatPrice(Number(price)) : "Price unavailable"}
+            </Typography>
+          )}
 
           {originalPrice !== undefined &&
             Number(originalPrice) > Number(price) && (

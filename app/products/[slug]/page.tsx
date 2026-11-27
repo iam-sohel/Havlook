@@ -8,7 +8,6 @@ import {
   getProductBySlug,
   listProducts,
   getProductDetailsById,
-  enrichProductListWithDetails,
 } from "@/services/productService";
 
 /**
@@ -52,24 +51,35 @@ export default async function ProductDetailsPage(props: PageProps) {
   // Related products: up to 4 products in the same category,
   // excluding the current product. The backend does not yet expose a
   // dedicated /related endpoint so we use the same-category subset of
-  // the catalogue, then enrich them with detail data.
+  // the catalogue, reusing the full product data already returned.
   const catalogue = await listProducts();
 
   const relatedSource =
     catalogue.source === "error" ? [] : catalogue.products;
 
   const relatedCandidates = relatedSource
-    .filter(
-      (p) =>
-        p.category &&
-        product.category &&
-        p.category === product.category &&
-        String(p.id) !== String(product.id),
-    )
+    .filter((p) => {
+      const hasProductCategoryId = product.categoryId != null;
+      const hasCandidateCategoryId = p.categoryId != null;
+
+      const sameCategory =
+        hasProductCategoryId && hasCandidateCategoryId
+          ? String(p.categoryId) === String(product.categoryId)
+          : Boolean(
+              p.category &&
+              product.category &&
+              p.category === product.category
+            );
+
+      return (
+        sameCategory &&
+        String(p.id) !== String(product.id)
+      );
+    })
     .sort((a, b) => Number(b.rating) - Number(a.rating))
     .slice(0, 4);
 
-  const related = await enrichProductListWithDetails(relatedCandidates);
+  const related = relatedCandidates;
 
   return (
     <>
