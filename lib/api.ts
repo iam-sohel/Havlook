@@ -217,6 +217,7 @@ export async function apiRequest<T>(
   if (resolvedToken) finalHeaders["Authorization"] = `Bearer ${resolvedToken}`;
 
   let response: Response;
+  const catalogueRequestStartedAt = debugCatalogue ? Date.now() : 0;
   try {
     response = await fetch(url, {
       method,
@@ -254,6 +255,7 @@ export async function apiRequest<T>(
     console.log("[HAVLOOK_CATALOGUE_HTTP]", {
       url: url.split("?")[0],
       status: response.status,
+      fetchDurationMs: Date.now() - catalogueRequestStartedAt,
       contentType: response.headers.get("content-type"),
       cfRay: response.headers.get("cf-ray"),
       redirected: response.redirected,
@@ -266,6 +268,7 @@ export async function apiRequest<T>(
   }
 
   let payload: unknown = null;
+  const catalogueBodyStartedAt = debugCatalogue ? Date.now() : 0;
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     try {
@@ -281,6 +284,10 @@ export async function apiRequest<T>(
   }
 
   if (debugCatalogue) {
+    console.log("[HAVLOOK_CATALOGUE_BODY]", {
+      jsonParseDurationMs: Date.now() - catalogueBodyStartedAt,
+      totalRequestDurationMs: Date.now() - catalogueRequestStartedAt,
+    });
     const envelope = payload as {
       success?: boolean;
       data?: { content?: unknown[] };

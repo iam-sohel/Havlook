@@ -8,7 +8,6 @@ import {
   getProductBySlug,
   listProducts,
   getProductDetailsById,
-  enrichProductListWithDetails,
 } from "@/services/productService";
 
 /**
@@ -49,10 +48,8 @@ export default async function ProductDetailsPage(props: PageProps) {
 
   const product = lookup.data;
 
-  // Related products: up to 4 products in the same category,
-  // excluding the current product. The backend does not yet expose a
-  // dedicated /related endpoint so we use the same-category subset of
-  // the catalogue, then enrich them with detail data.
+  // Related products: up to 4 detailed products from the same category.
+  // listProducts() already returns detail DTOs, so no second request is needed.
   const catalogue = await listProducts();
 
   const relatedSource =
@@ -69,7 +66,7 @@ export default async function ProductDetailsPage(props: PageProps) {
     .sort((a, b) => Number(b.rating) - Number(a.rating))
     .slice(0, 4);
 
-  const related = await enrichProductListWithDetails(relatedCandidates);
+  const related = relatedCandidates;
 
   return (
     <>

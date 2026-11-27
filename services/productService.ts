@@ -42,7 +42,8 @@ export type {
 const ENDPOINTS = {
   /* ----------------------------- Catalogue ------------------------------ */
 
-  products: "/api/v1/products",
+  products: (page = 0, size = 10) =>
+    `/api/v1/products?page=${page}&size=${size}`,
 
   productById: (id: string | number) =>
     `/api/v1/products/${encodeURIComponent(String(id))}`,
@@ -411,6 +412,7 @@ export async function enrichProductListWithDetails(
   products: Product[],
   options: {
     signal?: AbortSignal;
+    concurrency?: number;
   } = {},
 ): Promise<Product[]> {
   if (
@@ -423,6 +425,10 @@ export async function enrichProductListWithDetails(
   const {
     signal,
   } = options;
+  const concurrency = Math.min(
+    8,
+    Math.max(1, Math.floor(options.concurrency ?? ENRICH_CONCURRENCY)),
+  );
 
   const out: Product[] =
     new Array(products.length);
@@ -430,11 +436,11 @@ export async function enrichProductListWithDetails(
   for (
     let i = 0;
     i < products.length;
-    i += ENRICH_CONCURRENCY
+    i += concurrency
   ) {
     const batch = products.slice(
       i,
-      i + ENRICH_CONCURRENCY,
+      i + concurrency,
     );
 
     const responses =
@@ -635,8 +641,9 @@ export async function getProductsByCategory(
  * 5 Electronics + 3 products from other categories.
  */
 export async function getFeaturedProducts(): Promise<Product[]> {
-  const ELECTRONICS_CATEGORY_IDS = [1, 8, 16];
-  const OTHER_CATEGORY_IDS = [3, 10, 14, 19, 23, 24];
+  // Current active backend catalog has one category: Electronics (ID 3).
+  const ELECTRONICS_CATEGORY_IDS = [3];
+  const OTHER_CATEGORY_IDS: number[] = [];
   const PAGE_SIZE = 20;
 
   const shuffle = <T,>(items: T[]): T[] => {
@@ -846,6 +853,7 @@ export type ListProductsResult =
 
 interface ListProductsOptions {
   signal?: AbortSignal;
+  size?: number;
 }
 
 /**
@@ -871,7 +879,7 @@ export async function listProducts(
 
   const result =
     await apiRequest<BackendProductPageResponse>(
-      ENDPOINTS.products,
+      ENDPOINTS.products(0, options.size ?? 10),
       {
         method: "GET",
         signal,
@@ -903,6 +911,11 @@ export async function listProducts(
     };
   }
 
+  const debugCatalogueNormalization =
+    typeof window === "undefined" && options.size === 50;
+  const normalizationStartedAt = debugCatalogueNormalization
+    ? Date.now()
+    : 0;
   const products =
     page.content
       .map((dto) => {
@@ -920,6 +933,15 @@ export async function listProducts(
         ): product is Product =>
           product !== null,
       );
+
+  if (debugCatalogueNormalization) {
+    console.info("[HAVLOOK_CATALOGUE_NORMALIZE]", {
+      durationMs: Date.now() - normalizationStartedAt,
+      rawProductCount: page.content.length,
+      normalizedProductCount: products.length,
+      droppedProductCount: page.content.length - products.length,
+    });
+  }
 
   return {
     source: "backend",

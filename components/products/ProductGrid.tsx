@@ -1,10 +1,7 @@
 import { Grid } from "@mui/material";
 
 import ProductCard from "./ProductCard";
-import {
-  enrichProductListWithDetails,
-  listProducts,
-} from "@/services/productService";
+import { listProducts } from "@/services/productService";
 import { getProductImage } from "@/utils/productImages";
 import type { Product } from "@/types/product";
 
@@ -17,18 +14,13 @@ import type { Product } from "@/types/product";
  *
  * Data flow:
  *   1. `listProducts()` hits the Spring Boot catalogue endpoint.
- *      - If the backend is reachable we receive the live list of
- *        `ProductResponse` payloads.
- *      - If the backend is unreachable, the grid renders empty — there
- *        is no mock fallback.
- *   2. `enrichProductListWithDetails()` issues a follow-up
- *      `GET /api/v1/products/{id}/details` for each product in small
- *      parallel batches to upgrade it with images, variants,
- *      specifications and information. Failures on individual details
- *      calls keep the original product in place (graceful degradation).
+ *   2. The endpoint already returns detailed product DTOs, including
+ *      images, variants, pricing and ratings. Re-fetching every product
+ *      by ID would duplicate backend work without adding data.
+ *   3. If the backend is unreachable, the grid renders empty — there is
+ *      no mock fallback.
  *
- * The product card visual design is preserved — only the data layer
- * changed.
+ * The product card visual design is preserved.
  */
 export default async function ProductGrid() {
   const list = await listProducts();
@@ -36,11 +28,9 @@ export default async function ProductGrid() {
   const products: Product[] =
     list.source === "error" ? [] : list.products;
 
-  const enriched = await enrichProductListWithDetails(products);
-
   return (
     <Grid container spacing={3}>
-      {enriched.map((product) => {
+      {products.map((product) => {
         const image = getProductImage(product);
         const offer =
           product.discount && product.discount > 0
